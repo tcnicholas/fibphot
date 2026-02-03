@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 
+from .misc import ReprText, sig, trunc_keys, trunc_seq, uniform_repr
 from .types import FloatArray
 
 
@@ -18,6 +19,21 @@ class StageRecord:
     params: dict[str, Any] = field(default_factory=dict)
     metrics: dict[str, float] = field(default_factory=dict)
     notes: str | None = None
+
+    def __repr__(self) -> str:
+        info: dict[str, Any] = {
+            "stage_id": self.stage_id,
+            "name": self.name,
+        }
+        if self.params:
+            info["params"] = trunc_keys(self.params, max_items=10)
+        if self.metrics:
+            info["metrics"] = trunc_keys(self.metrics, max_items=10)
+        if self.notes:
+            # keep notes short-ish
+            note = self.notes.strip()
+            info["notes"] = note if len(note) <= 80 else (note[:77] + "...")
+        return uniform_repr("StageRecord", **info, indent_width=4)
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,3 +323,61 @@ class PhotometryState:
         from .io.h5 import load_state_h5
 
         return load_state_h5(path)
+
+    def __repr__(self) -> str:
+        info: dict[str, Any] = {}
+
+        if self.subject:
+            info["subject"] = self.subject
+        src = self.metadata.get("source_path")
+        if src:
+            from pathlib import Path
+
+            info["source"] = Path(str(src)).name
+
+        # core sizes
+        info["n_signals"] = self.n_signals
+        info["n_samples"] = self.n_samples
+
+        # time summary (cheap + robust)
+        if self.n_samples >= 2:
+            duration = float(self.time_seconds[-1] - self.time_seconds[0])
+            info["duration_s"] = sig(duration, 4)
+
+            t = self.time_seconds
+            m = min(int(t.shape[0]), 10_000)
+            if m >= 2:
+                dt = np.diff(t[:m])
+                dt = dt[np.isfinite(dt) & (dt > 0)]
+                if dt.size:
+                    fs = 1.0 / float(np.median(dt))
+                    info["fs_hz"] = sig(fs, 4)
+
+        info["channels"] = trunc_seq(self.channel_names, max_items=10)
+
+        info["history"] = int(self.history.shape[0])
+        if self.summary:
+            info["stages"] = len(self.summary)
+            info["last_stage"] = self.summary[-1].name
+
+            names = [r.name for r in self.summary]
+            if len(names) <= 5:
+                info["pipeline"] = tuple(names)
+            else:
+                info["pipeline"] = (names[0], names[1], "...", names[-1])
+
+        if self.derived:
+            info["derived"] = trunc_keys(self.derived, max_items=10)
+        if self.results:
+            info["results"] = trunc_keys(self.results, max_items=10)
+
+        if self.tags:
+            kv = [f"{k}={v}" for k, v in list(self.tags.items())[:8]]
+            more = len(self.tags) - len(kv)
+            if more > 0:
+                kv.append(f"...+{more}")
+            info["tags"] = ReprText("{" + ", ".join(kv) + "}")
+
+        return uniform_repr(
+            "PhotometryState", **info, indent_width=4, max_width=88
+        )

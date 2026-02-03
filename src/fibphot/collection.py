@@ -5,10 +5,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+import numpy as np
+
 from .analysis.aggregate import (
     AlignedSignals,
     align_collection_signals,
     mean_state_from_aligned,
+)
+from .misc import (
+    ReprText,
+    sig,
+    trunc_seq,
+    uniform_repr,
 )
 from .state import PhotometryState
 from .tags import TagTable, apply_tags, default_subject_getter, read_tag_table
@@ -205,3 +213,74 @@ class PhotometryCollection:
         from .io.h5 import load_collection_h5
 
         return load_collection_h5(path)
+
+    def __repr__(self) -> str:
+        info: dict[str, Any] = {}
+
+        n = len(self.states)
+        info["n_states"] = n
+        if n == 0:
+            return uniform_repr("PhotometryCollection", **info, indent_width=4)
+
+        # ---- subjects summary
+        subjects = [s.subject for s in self.states]
+        known = [x for x in subjects if x is not None]
+        uniq = sorted(set(known))
+        info["n_subjects"] = len(uniq)
+
+        if uniq:
+            shown = trunc_seq(uniq, max_items=8)
+            info["subjects"] = shown
+
+        # ---- channels summary (intersection/union)
+        sets = [set(s.channel_names) for s in self.states]
+        inter = set.intersection(*sets) if sets else set()
+        union = set.union(*sets) if sets else set()
+        info["channels_intersection"] = tuple(sorted(inter)) if inter else ()
+        info["channels_union_n"] = len(union)
+
+        # ---- stage depth summary
+        depths = np.array([len(s.summary) for s in self.states], dtype=int)
+        info["stages_med"] = int(np.median(depths))
+        info["stages_minmax"] = ReprText(
+            f"({int(depths.min())}, {int(depths.max())})"
+        )
+
+        # ---- sampling rate / duration summary
+        fs = np.array([s.sampling_rate for s in self.states], dtype=float)
+        info["fs_hz_med"] = sig(float(np.median(fs)), 4)
+        info["fs_hz_minmax"] = ReprText(
+            f"({sig(float(fs.min()), 4)}, {sig(float(fs.max()), 4)})"
+        )
+
+        dur = np.array(
+            [
+                float(s.time_seconds[-1] - s.time_seconds[0])
+                if s.n_samples >= 2
+                else 0.0
+                for s in self.states
+            ],
+            dtype=float,
+        )
+        info["duration_s_med"] = sig(float(np.median(dur)), 4)
+        info["duration_s_minmax"] = ReprText(
+            f"({sig(float(dur.min()), 4)}, {sig(float(dur.max()), 4)})"
+        )
+
+        # ---- tag-key coverage summary
+        tag_keys: dict[str, int] = {}
+        for s in self.states:
+            for k in s.tags:
+                tag_keys[k] = tag_keys.get(k, 0) + 1
+
+        if tag_keys:
+            items = sorted(tag_keys.items(), key=lambda kv: (-kv[1], kv[0]))
+            shown = items[:6]
+            parts = [f"{k}:{c}/{n}" for k, c in shown]
+            if len(items) > len(shown):
+                parts.append(f"...+{len(items) - len(shown)}")
+            info["tags"] = ReprText("{" + ", ".join(parts) + "}")
+
+        return uniform_repr(
+            "PhotometryCollection", **info, indent_width=4, max_width=88
+        )
