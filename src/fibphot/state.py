@@ -129,7 +129,7 @@ class PhotometryState:
 
     def channel(self, channel: str) -> FloatArray:
         return self.signals[self.idx(channel)]
-    
+
     def tag(self, key: str, default: str | None = None) -> str | None:
         return self.tags.get(key, default)
 
@@ -144,11 +144,9 @@ class PhotometryState:
         new_signals = self.signals.copy()
         new_signals[i] = v
         return replace(self, signals=new_signals)
-    
+
     def with_metadata(
-        self,
-        updates: dict[str, Any] | None = None,
-        **kwargs: Any
+        self, updates: dict[str, Any] | None = None, **kwargs: Any
     ) -> PhotometryState:
         patch: dict[str, Any] = {}
         if updates:
@@ -182,7 +180,7 @@ class PhotometryState:
             [self.history, self.signals[None, :, :]], axis=0
         )
         return replace(self, history=new_hist)
-    
+
     def raw(self) -> PhotometryState:
         """
         Return a new state representing the raw signals (after 0 stages).
@@ -211,15 +209,15 @@ class PhotometryState:
 
     def revert(self, n_steps: int | None = 1) -> PhotometryState:
         """
-        Revert to a previous signals snapshot and drops corresponding summary 
+        Revert to a previous signals snapshot and drops corresponding summary
         entries and stage results.
-    
+
         n_steps=1: before most recent stage
         n_steps=None: restore raw (after 0 stages)
         """
         if n_steps is None:
             return self.raw()
-    
+
         if n_steps < 1:
             raise ValueError("n_steps must be >= 1.")
         if self.history.shape[0] < n_steps:
@@ -267,7 +265,7 @@ class PhotometryState:
         for st in stages:
             state = st(state)
         return state
-    
+
     def plot(
         self,
         *,
@@ -281,9 +279,9 @@ class PhotometryState:
         return plot_current(self, signal=signal, control=control, **kwargs)
 
     def plot_history(self, channel: str, **kwargs):
-        """ Plot a channel across the saved history (and optionally current)."""
+        """Plot a channel across the saved history (and optionally current)."""
         from .plotting import plot_history
-    
+
         return plot_history(self, channel, **kwargs)
 
     def to_h5(

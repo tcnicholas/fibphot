@@ -39,7 +39,7 @@ def _r2_score(y: FloatArray, yhat: FloatArray) -> float:
 
 
 def _mad_sigma(x: FloatArray) -> float:
-    """ Robust scale estimate using MAD, scaled for Normal data. """
+    """Robust scale estimate using MAD, scaled for Normal data."""
     x = np.asarray(x, dtype=float)
     med = float(np.median(x))
     mad = float(np.median(np.abs(x - med)))
@@ -109,7 +109,7 @@ def fit_ols(
 
 
 def _weights_tukey(u: FloatArray) -> FloatArray:
-    """ Tukey's bisquare weights: w = (1 - u^2)^2 for |u|<1 else 0. """
+    """Tukey's bisquare weights: w = (1 - u^2)^2 for |u|<1 else 0."""
     u = np.asarray(u, dtype=float)
     w = np.zeros_like(u)
     inside = np.abs(u) < 1.0
@@ -118,7 +118,7 @@ def _weights_tukey(u: FloatArray) -> FloatArray:
 
 
 def _weights_huber(u: FloatArray) -> FloatArray:
-    """ Huber weights: w = 1 for |u|<=1 else 1/|u|. """
+    """Huber weights: w = 1 for |u|<=1 else 1/|u|."""
     u = np.asarray(u, dtype=float)
     au = np.abs(u)
     w = np.ones_like(u)
@@ -232,9 +232,9 @@ def fit_irls(
         di = abs(intercept - last_intercept) if include_intercept else 0.0
         ds = abs(slope - last_slope)
         denom = (
-            abs(last_slope) + (
-                abs(last_intercept) if include_intercept else 0.0
-            ) + 1e-18
+            abs(last_slope)
+            + (abs(last_intercept) if include_intercept else 0.0)
+            + 1e-18
         )
         if (di + ds) / denom < tol:
             break

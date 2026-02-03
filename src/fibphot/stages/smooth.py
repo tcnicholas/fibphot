@@ -111,12 +111,16 @@ def savgol_smooth_1d(
     if not np.all(m):
         xi = np.arange(x.size, dtype=float)
         xp = np.interp(xi, xi[m], x[m])
-        y = savgol_filter(xp, window_length=window_len, polyorder=polyorder, mode=mode)
-        y[~m] = np.nan # type: ignore
+        y = savgol_filter(
+            xp, window_length=window_len, polyorder=polyorder, mode=mode
+        )
+        y[~m] = np.nan  # type: ignore
         return np.asarray(y, dtype=float)
 
     return np.asarray(
-        savgol_filter(x, window_length=window_len, polyorder=polyorder, mode=mode),
+        savgol_filter(
+            x, window_length=window_len, polyorder=polyorder, mode=mode
+        ),
         dtype=float,
     )
 
@@ -332,8 +336,7 @@ class Smooth(UpdateStage):
     def apply(self, state: PhotometryState) -> StageOutput:
         if self.window_len < 3:
             return StageOutput(
-                signals=state.signals.copy(),
-                notes="No-op: window_len < 3."
+                signals=state.signals.copy(), notes="No-op: window_len < 3."
             )
         if self.window_len % 2 == 0:
             raise ValueError("window_len must be odd and >= 3.")
@@ -376,7 +379,9 @@ class SavGolSmooth(UpdateStage):
 
     def apply(self, state: PhotometryState) -> StageOutput:
         if self.window_len < 3:
-            return StageOutput(signals=state.signals.copy(), notes="No-op: window_len < 3.")
+            return StageOutput(
+                signals=state.signals.copy(), notes="No-op: window_len < 3."
+            )
         if self.window_len % 2 == 0:
             raise ValueError("window_len must be odd and >= 3.")
         if self.polyorder >= self.window_len:

@@ -19,6 +19,7 @@ class AnalysisWindow:
     - ref="seconds": start/end are in seconds (state.time_seconds space)
     - ref="samples": start/end are integer sample indices [start, end)
     """
+
     start: float | int
     end: float | int
     ref: WindowRef = "seconds"
@@ -27,9 +28,9 @@ class AnalysisWindow:
 
 @dataclass(frozen=True, slots=True)
 class AnalysisResult:
-    name: str                       # e.g. "auc"
-    channel: str                    # e.g. "gcamp"
-    window: AnalysisWindow | None   # None means “whole trace”
+    name: str  # e.g. "auc"
+    channel: str  # e.g. "gcamp"
+    window: AnalysisWindow | None  # None means “whole trace”
     params: dict[str, Any] = field(default_factory=dict)
 
     metrics: dict[str, float] = field(default_factory=dict)
@@ -47,7 +48,9 @@ class PhotometryReport:
         return PhotometryReport(self.state, results=(*self.results, result))
 
     def extend(self, results: Iterable[AnalysisResult]) -> PhotometryReport:
-        return PhotometryReport(self.state, results=(*self.results, *tuple(results)))
+        return PhotometryReport(
+            self.state, results=(*self.results, *tuple(results))
+        )
 
     def find(self, name: str) -> tuple[AnalysisResult, ...]:
         return tuple(r for r in self.results if r.name == name)

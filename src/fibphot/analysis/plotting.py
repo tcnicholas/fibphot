@@ -19,9 +19,9 @@ def plot_auc_result(
     linewidth: float = 1.2,
     fontsize: int = 8,
     show_metrics: bool = True,
-    colour_signal: str = "#1f77b4",   # vivid blue
-    colour_baseline: str = "#444444", # dark grey
-    colour_fill: str = "#ff7f0e",     # vivid orange
+    colour_signal: str = "#1f77b4",  # vivid blue
+    colour_baseline: str = "#444444",  # dark grey
+    colour_fill: str = "#ff7f0e",  # vivid orange
 ):
     """
     Visualise an AUC AnalysisResult:
@@ -40,16 +40,30 @@ def plot_auc_result(
     y = np.asarray(state.channel(chan), float)
 
     lab = label or chan
-    ax.plot(t, y, linewidth=linewidth, alpha=signal_alpha, label=lab, color=colour_signal)
+    ax.plot(
+        t,
+        y,
+        linewidth=linewidth,
+        alpha=signal_alpha,
+        label=lab,
+        color=colour_signal,
+    )
 
     b = float(result.metrics.get("baseline", np.nan))
     if np.isfinite(b):
-        ax.axhline(b, linewidth=1.0, alpha=0.85, linestyle="--", color=colour_baseline)
+        ax.axhline(
+            b, linewidth=1.0, alpha=0.85, linestyle="--", color=colour_baseline
+        )
 
     # Window display
     t0 = result.metrics.get("t0", None)
     t1 = result.metrics.get("t1", None)
-    if t0 is not None and t1 is not None and np.isfinite(t0) and np.isfinite(t1):
+    if (
+        t0 is not None
+        and t1 is not None
+        and np.isfinite(t0)
+        and np.isfinite(t1)
+    ):
         ax.axvspan(float(t0), float(t1), alpha=window_alpha, color="grey")
 
     # Fill based on stored arrays
@@ -57,7 +71,14 @@ def plot_auc_result(
     contrib = np.asarray(result.arrays.get("contrib", np.array([])), float)
 
     if tt.size >= 2 and contrib.size == tt.size and np.isfinite(b):
-        ax.fill_between(tt, b, b + contrib, alpha=fill_alpha, color=colour_fill, label="AUC area")
+        ax.fill_between(
+            tt,
+            b,
+            b + contrib,
+            alpha=fill_alpha,
+            color=colour_fill,
+            label="AUC area",
+        )
 
     ax.set_xlabel("time (s)", fontsize=fontsize)
     ax.set_ylabel(chan, fontsize=fontsize)

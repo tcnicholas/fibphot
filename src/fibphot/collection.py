@@ -34,11 +34,10 @@ class PhotometryCollection:
 
     @classmethod
     def from_iterable(
-        cls,
-        states: Iterable[PhotometryState]
+        cls, states: Iterable[PhotometryState]
     ) -> PhotometryCollection:
         return cls(states=tuple(states))
-    
+
     @classmethod
     def from_glob(
         cls,
@@ -49,7 +48,6 @@ class PhotometryCollection:
         metadata_fn: Callable[[Path], dict[str, Any]] | None = None,
         sort: bool = True,
     ) -> PhotometryCollection:
-
         base = Path(base_path)
         paths = list(base.glob(pattern))
         if sort:
@@ -78,7 +76,7 @@ class PhotometryCollection:
         return PhotometryCollection(
             states=tuple(s.pipe(*stages) for s in self.states)
         )
-    
+
     def with_tags_from_table(
         self,
         path: Path | str,
@@ -110,7 +108,7 @@ class PhotometryCollection:
         """
         Filter by tags: e.g. .filter(genotype="KO", context="A")
         """
-    
+
         def ok(s: PhotometryState) -> bool:
             tags = s.tags
             return all(tags.get(k) == v for k, v in criteria.items())
@@ -138,6 +136,7 @@ class PhotometryCollection:
         Sort by one or more tag keys (lexicographic).
         Missing values sort as "".
         """
+
         def sort_key(s: PhotometryState) -> tuple[str, ...]:
             tags = s.tags
             return tuple(tags.get(k, "") for k in keys)
@@ -147,11 +146,10 @@ class PhotometryCollection:
         )
 
     def map(
-        self,
-        fn: Callable[[PhotometryState], PhotometryState]
+        self, fn: Callable[[PhotometryState], PhotometryState]
     ) -> PhotometryCollection:
         return PhotometryCollection(states=tuple(fn(s) for s in self.states))
-    
+
     def align(
         self,
         *,

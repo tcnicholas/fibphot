@@ -7,6 +7,15 @@ name = "fibphot"
 version = "0.1.0"
 description = "Analysis pipeline for fibre photometry data"
 readme = "README.md"
+authors = [{ name = "Thomas Nicholas", email = "tcnicholas@me.com" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 requires-python = ">=3.10"
 dependencies = [
     "h5py>=3.15.1",
@@ -18,12 +27,25 @@ dependencies = [
     "scipy>=1.17.0",
 ]
 
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+topo_metrics = ["RingStatistics/**/*"]
+
+[project.urls]
+Homepage = "https://github.com/tcnicholas/fibphot"
+
 [project.optional-dependencies]
 dev = [
     "ruff>=0.14.13",
     "pytest>=8.0",
     "matplotlib>=3.10.8",
 ]
+publish = ["build", "twine"]
 docs = [
     "sphinx",
     "pip",
@@ -43,19 +65,33 @@ docs = [
     "sphinx_sitemap",
 ]
 
-[tool.setuptools]
-package-dir = {"" = "src"}
+[tool.bumpver]
+current_version = "0.1.0"
+version_pattern = "MAJOR.MINOR.PATCH"
+commit_message = "bump {old_version} -> {new_version}"
+commit = true
+tag = true
+push = false
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.bumpver.file_patterns]
+"pyproject.toml" = ['current_version = "{version}"', 'version = "{version}"']
+"src/fibphot/__init__.py" = ["{version}"]
 
 [tool.ruff]
 line-length = 80
-target-version = "py311"
+indent-width = 4
+target-version = "py38"
+extend-include = ["*.ipynb", "*.pyi", "*.toml"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["E501"]
+select = ["E", "F", "UP", "B", "SIM", "I"]
+ignore = ["SIM300", "E402", "E703", "F722", "UP037", "F821", "B018", "E741"]
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-[tool.ruff.lint.isort]
-combine-as-imports = true
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

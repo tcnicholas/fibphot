@@ -39,17 +39,14 @@ def _interp_x_at_positions(x: FloatArray, positions: FloatArray) -> FloatArray:
 
 
 def _baseline_flat(y: FloatArray, left_i: int, right_i: int) -> float:
-    """ Flat baseline between two indices. """
+    """Flat baseline between two indices."""
     return float(0.5 * (y[left_i] + y[right_i]))
 
 
 def _baseline_line(
-    x: FloatArray,
-    y: FloatArray,
-    left_i: int,
-    right_i: int
+    x: FloatArray, y: FloatArray, left_i: int, right_i: int
 ) -> FloatArray:
-    """ Linear baseline between two indices. """
+    """Linear baseline between two indices."""
     x0 = float(x[left_i])
     x1 = float(x[right_i])
     if np.isclose(x1, x0):
@@ -61,7 +58,7 @@ def _baseline_line(
 
 
 def _r2(y: FloatArray, yhat: FloatArray) -> float:
-    """ Coefficient of determination. """
+    """Coefficient of determination."""
     y = np.asarray(y, dtype=float)
     yhat = np.asarray(yhat, dtype=float)
     ss_res = float(np.sum((y - yhat) ** 2))
@@ -72,33 +69,25 @@ def _r2(y: FloatArray, yhat: FloatArray) -> float:
 
 
 def _rmse(y: FloatArray, yhat: FloatArray) -> float:
-    """ Root mean square error. """
+    """Root mean square error."""
     y = np.asarray(y, dtype=float)
     yhat = np.asarray(yhat, dtype=float)
     return float(np.sqrt(np.mean((y - yhat) ** 2)))
 
 
 def gaussian(
-    x: FloatArray,
-    amp: float,
-    mu: float,
-    sigma: float,
-    offset: float
+    x: FloatArray, amp: float, mu: float, sigma: float, offset: float
 ) -> FloatArray:
-    """ Gaussian function. """
+    """Gaussian function."""
     x = np.asarray(x, dtype=float)
     sigma = max(float(sigma), 1e-12)
     return offset + amp * np.exp(-0.5 * ((x - mu) / sigma) ** 2)
 
 
 def lorentzian(
-    x: FloatArray,
-    amp: float,
-    x0: float,
-    gamma: float,
-    offset: float
+    x: FloatArray, amp: float, x0: float, gamma: float, offset: float
 ) -> FloatArray:
-    """ Lorentzian function. """
+    """Lorentzian function."""
     x = np.asarray(x, dtype=float)
     gamma = max(float(gamma), 1e-12)
     return offset + amp * (gamma**2) / ((x - x0) ** 2 + gamma**2)
@@ -385,7 +374,9 @@ def fit_peak(
     y = np.asarray(y, dtype=float)
 
     func = _MODEL_FUNCS[model]
-    lo, hi = _fit_window_indices(x, peak, window=window, window_samples=window_samples)
+    lo, hi = _fit_window_indices(
+        x, peak, window=window, window_samples=window_samples
+    )
 
     xf = x[lo:hi]
     yf = y[lo:hi]
@@ -533,7 +524,9 @@ class PeakFinder:
         idx, props = scipy.signal.find_peaks(y, **kwargs)
         return idx, props
 
-    def _fit_one_kind(self, y: FloatArray, x: FloatArray, *, kind: PeakKind) -> list[Peak]:
+    def _fit_one_kind(
+        self, y: FloatArray, x: FloatArray, *, kind: PeakKind
+    ) -> list[Peak]:
         if kind == "peak":
             y_work = y
             sign = 1.0

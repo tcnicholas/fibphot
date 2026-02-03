@@ -16,7 +16,7 @@ class TagTable:
     """
     Mapping from subject -> tags.
 
-    The first column is assumed to be the subject identifier. Remaining columns 
+    The first column is assumed to be the subject identifier. Remaining columns
     are treated as tag keys.
     """
 

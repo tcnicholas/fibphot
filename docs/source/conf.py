@@ -14,25 +14,27 @@ PKG_DIR = SRC_DIR / "fibphot"
 
 sys.path.insert(0, str(SRC_DIR))
 
-ANNOUNCEMENT = Path(__file__).parent.joinpath(
-    "_templates", "announcement.html"
-).read_text(encoding="utf-8")
+ANNOUNCEMENT = (
+    Path(__file__)
+    .parent.joinpath("_templates", "announcement.html")
+    .read_text(encoding="utf-8")
+)
 
 
 # -- Project information -----------------------------------------------------
 
-project = 'fibphot'
-copyright = '2026, Thomas C. Nicholas'
-author = 'Thomas C. Nicholas'
+project = "fibphot"
+copyright = "2026, Thomas C. Nicholas"
+author = "Thomas C. Nicholas"
 
-version = '0.0.1'
-release = '0.0.1'
+version = "0.0.1"
+release = "0.0.1"
 
 # -- General configuration ---------------------------------------------------
 
 extensions = [
     "sphinx.ext.napoleon",
-    #"sphinx.ext.autodoc",
+    # "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
@@ -40,7 +42,7 @@ extensions = [
     "sphinx.ext.graphviz",
     "sphinx_design",
     "sphinx_copybutton",
-    #"autoapi.extension",
+    # "autoapi.extension",
     "jupyter_sphinx",
     "nbsphinx",
     "sphinx_togglebutton",
@@ -51,7 +53,7 @@ extensions = [
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True
 
-templates_path = ['_templates']
+templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 intersphinx_mapping = {"sphinx": ("https://www.sphinx-doc.org/en/master", None)}
 
@@ -129,7 +131,7 @@ html_theme_options = {
 html_context = {
     "github_user": "tcnicholas",
     "github_repo": "fibphot",
-    "github_version": "main", 
+    "github_version": "main",
     "doc_path": "docs",
 }
 html_static_path = ["_static"]

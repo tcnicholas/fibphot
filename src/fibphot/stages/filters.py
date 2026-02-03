@@ -105,12 +105,12 @@ class HampelFilter(UpdateStage):
     -------
     The Hampel filter is a robust method for outlier detection and correction
     in time series data. It replaces outliers with the median of neighbouring
-    values within a specified window, making it effective for removing transient 
+    values within a specified window, making it effective for removing transient
     spikes or noise without significantly distorting the underlying signal.
 
-    Compared to the `MedianFilter`, which replaces each point with the median of 
+    Compared to the `MedianFilter`, which replaces each point with the median of
     its neighbours, the Hampel filter specifically targets outliers based on
-    their deviation from the local median. Hence, it does not alter the signal 
+    their deviation from the local median. Hence, it does not alter the signal
     unless an outlier is detected.
     """
 
@@ -180,25 +180,25 @@ class LowPassFilter(UpdateStage):
     Parameters
     ----------
     critical_frequency : float
-        The critical frequency (in Hz) for the low-pass filter. This is where 
+        The critical frequency (in Hz) for the low-pass filter. This is where
         the filter begins to attenuate higher frequencies.
     order : int
-        The order of the Butterworth filter. Higher order filters have a 
+        The order of the Butterworth filter. Higher order filters have a
         steeper roll-off.
     sampling_rate : float | None
-        The sampling rate (in Hz) of the input signals. If None, uses the 
+        The sampling rate (in Hz) of the input signals. If None, uses the
         sampling rate from the PhotometryState.
     channels : str | list[str] | None
-        The channels to which the filter should be applied. Can be "all", a 
-        single channel name, or a list of channel names. If None, defaults to 
+        The channels to which the filter should be applied. Can be "all", a
+        single channel name, or a list of channel names. If None, defaults to
         "all".
     representation : Literal["sos", "ba"]
-        The filter representation to use. "sos" for second-order sections 
+        The filter representation to use. "sos" for second-order sections
         (numerically stable), or "ba" for (b, a) coefficients.
 
     Context
-    ------- 
-    Biosensor kinetics typically operate on slower (e.g., sub-second) timescales 
+    -------
+    Biosensor kinetics typically operate on slower (e.g., sub-second) timescales
     relative to higher-frequency electrical noise. A low-pass filter keeps low
     frequencies and attenuates high frequencies.
     """
@@ -221,7 +221,8 @@ class LowPassFilter(UpdateStage):
 
     def apply(self, state: PhotometryState) -> StageOutput:
         fs = (
-            state.sampling_rate if self.sampling_rate is None
+            state.sampling_rate
+            if self.sampling_rate is None
             else float(self.sampling_rate)
         )
         if not (0.0 < self.critical_frequency < 0.5 * fs):
@@ -246,7 +247,6 @@ class LowPassFilter(UpdateStage):
             return StageOutput(signals=new)
 
         if self.representation == "ba":
-
             res = scipy.signal.butter(
                 N=self.order,
                 Wn=self.critical_frequency,
@@ -259,8 +259,10 @@ class LowPassFilter(UpdateStage):
                 raise RuntimeError(
                     "scipy.signal.butter returned None; check filter params."
                 )
-            
-            assert len(res)==2, "Expected (b,a) tuple from scipy.signal.butter."
+
+            assert len(res) == 2, (
+                "Expected (b,a) tuple from scipy.signal.butter."
+            )
             b, a = res
 
             for i in idxs:

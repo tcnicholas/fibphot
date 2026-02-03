@@ -12,7 +12,7 @@ from ..types import FloatArray
 
 @dataclass(frozen=True, slots=True)
 class StageOutput:
-    """ Output of a processing stage. """
+    """Output of a processing stage."""
 
     signals: FloatArray | None = None
     derived: dict[str, FloatArray] | None = None
@@ -23,10 +23,9 @@ class StageOutput:
 
 
 def _resolve_channels(
-    state: PhotometryState,
-    channels: str | list[str] | None
+    state: PhotometryState, channels: str | list[str] | None
 ) -> list[int]:
-    """ Resolve channel names to indices. """
+    """Resolve channel names to indices."""
 
     if channels is None or (
         isinstance(channels, str) and channels.lower() == "all"
@@ -45,11 +44,11 @@ class UpdateStage(ABC):
 
     @abstractmethod
     def apply(self, state: PhotometryState) -> StageOutput:
-        """ Apply the stage to the given PhotometryState. """
+        """Apply the stage to the given PhotometryState."""
         raise NotImplementedError
 
     def __call__(self, state: PhotometryState) -> PhotometryState:
-        """ Apply the stage and return an updated PhotometryState. """
+        """Apply the stage and return an updated PhotometryState."""
 
         state0 = state.push_history()
 
@@ -59,12 +58,12 @@ class UpdateStage(ABC):
             out.data.get("time_seconds", state0.time_seconds), dtype=float
         )
         history = np.asarray(
-            out.data.get("history", state0.history),
-            dtype=float
+            out.data.get("history", state0.history), dtype=float
         )
 
         new_signals = (
-            state0.signals if out.signals is None 
+            state0.signals
+            if out.signals is None
             else np.asarray(out.signals, dtype=float)
         )
 

@@ -32,12 +32,12 @@ class PlotTheme:
     alpha: float = 1.0
 
     # Vibrant, colour-blind friendly
-    signal_colour: str = "#0072B2"       # blue
-    control_colour: str = "#000000"      # black
-    baseline_colour: str = "#E69F00"     # orange (baseline fit)
-    fit_colour: str = "#009E73"          # green (motion/control fit)
-    difference_colour: str = "#D55E00"   # vermillion
-    accent_purple: str = "#CC79A7"       # purple
+    signal_colour: str = "#0072B2"  # blue
+    control_colour: str = "#000000"  # black
+    baseline_colour: str = "#E69F00"  # orange (baseline fit)
+    fit_colour: str = "#009E73"  # green (motion/control fit)
+    difference_colour: str = "#D55E00"  # vermillion
+    accent_purple: str = "#CC79A7"  # purple
 
     cycle: tuple[str, ...] = (
         "#0072B2",  # blue
@@ -66,6 +66,7 @@ def set_plot_defaults() -> None:
         }
     )
 
+
 def _apply_theme(ax: Axes, theme: PlotTheme) -> None:
     ax.tick_params(labelsize=theme.tick_size)
     ax.xaxis.label.set_fontsize(theme.label_size)
@@ -76,7 +77,9 @@ def _apply_theme(ax: Axes, theme: PlotTheme) -> None:
     ax.spines["right"].set_visible(False)
 
 
-def _new_axes(ax: Axes | None, theme: PlotTheme) -> tuple[Figure | SubFigure, Axes]:
+def _new_axes(
+    ax: Axes | None, theme: PlotTheme
+) -> tuple[Figure | SubFigure, Axes]:
     if ax is not None:
         fig = ax.figure
         _apply_theme(ax, theme)
@@ -283,7 +286,7 @@ def plot_current(
         ax.plot(
             t,
             base[i_sig] + off,
-            label=baseline_key if off==0.0 else f"{baseline_key} (offset)",
+            label=baseline_key if off == 0.0 else f"{baseline_key} (offset)",
             color=theme.baseline_colour,
             linewidth=max(1.6, theme.linewidth * 1.6),
             alpha=1.0,
@@ -302,7 +305,9 @@ def plot_current(
         ax.plot(
             t,
             mf[i_sig] + off,
-            label=motion_fit_key if off==0.0 else f"{motion_fit_key} (offset)",
+            label=motion_fit_key
+            if off == 0.0
+            else f"{motion_fit_key} (offset)",
             color=theme.fit_colour,
             linewidth=max(1.4, theme.linewidth * 1.4),
             alpha=0.95,
@@ -324,7 +329,6 @@ def plot_current(
         ax.legend(frameon=False, fontsize=theme.legend_size)
 
     return fig, ax
-
 
 
 def _label_for_state_index(
@@ -381,7 +385,9 @@ def plot_history(
 
     if around:
         if k == 0:
-            raise ValueError("No stages have been applied; cannot plot around a stage.")
+            raise ValueError(
+                "No stages have been applied; cannot plot around a stage."
+            )
 
         si = _find_stage_index(
             state,

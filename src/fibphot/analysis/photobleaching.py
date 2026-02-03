@@ -106,10 +106,7 @@ def _norm_shape_rmse(a: FloatArray, b: FloatArray, eps: float = 1e-12) -> float:
     a0 = float(a[0])
     b0 = float(b[0])
     if not (
-        np.isfinite(a0) or 
-        not np.isfinite(b0) or 
-        abs(a0) < eps or 
-        abs(b0) < eps
+        np.isfinite(a0) or not np.isfinite(b0) or abs(a0) < eps or abs(b0) < eps
     ):
         return float("nan")
 
@@ -270,7 +267,7 @@ def get_baseline_trace(
     """
     if baseline_key not in state.derived:
         raise KeyError(
-            f"derived['{baseline_key}'] not found. " 
+            f"derived['{baseline_key}'] not found. "
             "Run the baseline stage first."
         )
     base = np.asarray(state.derived[baseline_key], dtype=float)

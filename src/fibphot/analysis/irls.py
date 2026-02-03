@@ -20,6 +20,7 @@ PlotView = Literal["current", "raw", "before_stage", "after_stage"]
 @dataclass(frozen=True, slots=True)
 class SweepSpec:
     """How to select x/y from a state for the sweep."""
+
     control: str = "iso"
     channel: str = "gcamp"
     view: PlotView = "current"
@@ -58,7 +59,9 @@ def _find_stage_index(
     occurrence: int,
 ) -> int:
     if stage_name is None and stage_id is None:
-        raise ValueError("Provide stage_name or stage_id for stage-based views.")
+        raise ValueError(
+            "Provide stage_name or stage_id for stage-based views."
+        )
 
     matches: list[int] = []
     for i, rec in enumerate(state.summary):
@@ -183,13 +186,19 @@ def irls_tuning_sweep_xy(
             "slope": float(fit.slope),
             "intercept": float(fit.intercept),
             "r2": float(fit.r2),
-            "n_iter": float(fit.n_iter) if fit.n_iter is not None else float("nan"),
-            "scale": float(fit.scale) if fit.scale is not None else float("nan"),
+            "n_iter": float(fit.n_iter)
+            if fit.n_iter is not None
+            else float("nan"),
+            "scale": float(fit.scale)
+            if fit.scale is not None
+            else float("nan"),
         }
         row.update(_weight_stats(fit.weights))
         rows.append(row)
 
-    df = pd.DataFrame(rows).sort_values("tuning_constant").reset_index(drop=True)
+    df = (
+        pd.DataFrame(rows).sort_values("tuning_constant").reset_index(drop=True)
+    )
     df["loss"] = loss
     return df
 
@@ -261,7 +270,9 @@ def plot_irls_tuning_sweep(
     required = {"tuning_constant", "slope", "intercept", "r2"}
     missing = required - set(df.columns)
     if missing:
-        raise ValueError(f"DataFrame missing required columns: {sorted(missing)}")
+        raise ValueError(
+            f"DataFrame missing required columns: {sorted(missing)}"
+        )
 
     x = np.asarray(df["tuning_constant"], dtype=float)
 

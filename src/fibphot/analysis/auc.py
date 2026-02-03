@@ -79,7 +79,9 @@ def _resolve_window_seconds(
         if i0 < 0 or i1 < 0:
             raise ValueError("Sample windows must be non-negative.")
         if i0 >= i1:
-            raise ValueError(f"Expected start < end for samples, got {i0} >= {i1}.")
+            raise ValueError(
+                f"Expected start < end for samples, got {i0} >= {i1}."
+            )
         i0 = max(0, min(n, i0))
         i1 = max(0, min(n, i1))
 
@@ -148,8 +150,14 @@ def _baseline_value(
         # If pre-window is empty (event near start), fall back to sample-based pre,
         # then to window.
         if int(np.sum(m)) < 2:
-            if state.n_samples > 1 and np.isfinite(state.sampling_rate) and state.sampling_rate > 0:
-                pre_n = int(round(float(pre_seconds) * float(state.sampling_rate)))
+            if (
+                state.n_samples > 1
+                and np.isfinite(state.sampling_rate)
+                and state.sampling_rate > 0
+            ):
+                pre_n = int(
+                    round(float(pre_seconds) * float(state.sampling_rate))
+                )
             else:
                 pre_n = 0
 
@@ -204,16 +212,28 @@ def auc_window(
     tt = t[m]
     yy = y[m]
     if tt.size < 2:
-        return {"auc": float("nan"), "mean": float("nan"), "n_points": float(tt.size)}
+        return {
+            "auc": float("nan"),
+            "mean": float("nan"),
+            "n_points": float(tt.size),
+        }
 
     u = yy - float(baseline_value)
     c = _contrib(u, mode)
     area = _trapz(c, tt)
 
     duration = float(tt[-1] - tt[0])
-    mean_amp = area / duration if duration > 0 and np.isfinite(duration) else float("nan")
+    mean_amp = (
+        area / duration
+        if duration > 0 and np.isfinite(duration)
+        else float("nan")
+    )
 
-    return {"auc": float(area), "mean": float(mean_amp), "n_points": float(tt.size)}
+    return {
+        "auc": float(area),
+        "mean": float(mean_amp),
+        "n_points": float(tt.size),
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -248,7 +268,9 @@ class AUC:
         t = _as_float_array(state.time_seconds)
         y = _as_float_array(state.channel(self.signal))
 
-        window_mask, t0, t1, i0, i1 = _resolve_window_seconds(state, self.window)
+        window_mask, t0, t1, i0, i1 = _resolve_window_seconds(
+            state, self.window
+        )
 
         # windowed samples
         m = window_mask & np.isfinite(y) & np.isfinite(t)
@@ -297,7 +319,11 @@ class AUC:
 
         area = _trapz(contrib, tt)
         duration = float(tt[-1] - tt[0])
-        mean_amp = area / duration if duration > 0 and np.isfinite(duration) else float("nan")
+        mean_amp = (
+            area / duration
+            if duration > 0 and np.isfinite(duration)
+            else float("nan")
+        )
 
         return AnalysisResult(
             name=self.name,

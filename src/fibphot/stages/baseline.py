@@ -20,13 +20,17 @@ def double_exponential(
     tau_fast: float,
     tau_slow: float,
 ) -> FloatArray:
-    """ Double exponential function for baseline fitting. """
+    """Double exponential function for baseline fitting."""
     t = np.asarray(times, dtype=float)
-    return const + amp_slow*np.exp(-t/tau_slow) + amp_fast*np.exp(-t/tau_fast)
+    return (
+        const
+        + amp_slow * np.exp(-t / tau_slow)
+        + amp_fast * np.exp(-t / tau_fast)
+    )
 
 
 def _r2(y: FloatArray, yhat: FloatArray) -> float:
-    """ Coefficient of determination R^2. """
+    """Coefficient of determination R^2."""
     y = np.asarray(y, dtype=float)
     yhat = np.asarray(yhat, dtype=float)
     ss_res = float(np.sum((y - yhat) ** 2))
@@ -37,14 +41,14 @@ def _r2(y: FloatArray, yhat: FloatArray) -> float:
 
 
 def _rmse(y: FloatArray, yhat: FloatArray) -> float:
-    """ Root mean square error. """
+    """Root mean square error."""
     y = np.asarray(y, dtype=float)
     yhat = np.asarray(yhat, dtype=float)
     return float(np.sqrt(np.mean((y - yhat) ** 2)))
 
 
 def _initial_guess(y: FloatArray) -> list[float]:
-    """ Initial guess for double exponential fitting. """
+    """Initial guess for double exponential fitting."""
     y = np.asarray(y, dtype=float)
     n = y.shape[0]
     tail = y[int(n * 0.9) :] if n >= 10 else y
@@ -94,7 +98,6 @@ class DoubleExpBaseline(UpdateStage):
             y_full = state.signals[i]
 
             if decim > 1:
-
                 # decimate both for fitting.
                 y_fit = scipy.signal.decimate(
                     y_full, decim, ftype="fir", zero_phase=True
@@ -113,12 +116,18 @@ class DoubleExpBaseline(UpdateStage):
 
             y_max = float(np.max(y_fit))
             lo = [
-                0.0, 0.0, 0.0,
-                self.tau_fast_bounds[0], self.tau_slow_bounds[0]
+                0.0,
+                0.0,
+                0.0,
+                self.tau_fast_bounds[0],
+                self.tau_slow_bounds[0],
             ]
             hi = [
-                y_max, y_max, y_max, 
-                self.tau_fast_bounds[1], self.tau_slow_bounds[1]
+                y_max,
+                y_max,
+                y_max,
+                self.tau_fast_bounds[1],
+                self.tau_slow_bounds[1],
             ]
 
             popt, _ = scipy.optimize.curve_fit(
@@ -143,12 +152,12 @@ class DoubleExpBaseline(UpdateStage):
                 new_signals[i] = new_signals[i] - baseline[i]
 
         metrics = {
-            "mean_r2": float(
-                np.nanmean(r2_out[idxs])
-            ) if idxs else float("nan"),
-            "mean_rmse": float(
-                np.nanmean(rmse_out[idxs])
-            ) if idxs else float("nan"),
+            "mean_r2": float(np.nanmean(r2_out[idxs]))
+            if idxs
+            else float("nan"),
+            "mean_rmse": float(np.nanmean(rmse_out[idxs]))
+            if idxs
+            else float("nan"),
             "decimate_factor": float(decim),
         }
 
@@ -161,7 +170,7 @@ class DoubleExpBaseline(UpdateStage):
 
         notes = (
             "Fitted double exponential baseline; parameters are stored per "
-            "channel. Baseline curves are available in " 
+            "channel. Baseline curves are available in "
             "derived['double_exp_baseline']."
         )
 
@@ -192,7 +201,11 @@ def _summarise_pybaselines_params(params: dict[str, Any]) -> dict[str, Any]:
             if v.size <= 16:
                 out[k] = np.asarray(v).tolist()
             else:
-                out[k] = {"type": "ndarray", "shape": v.shape, "dtype": str(v.dtype)}
+                out[k] = {
+                    "type": "ndarray",
+                    "shape": v.shape,
+                    "dtype": str(v.dtype),
+                }
             continue
 
         if isinstance(v, (list, tuple)):
@@ -306,7 +319,11 @@ class PyBaselinesBaseline(UpdateStage):
             per_channel[state.channel_names[i]] = {
                 "method": self.method,
                 "method_kwargs": dict(self.method_kwargs),
-                "params": (params if self.store_full_params else _summarise_pybaselines_params(params)),
+                "params": (
+                    params
+                    if self.store_full_params
+                    else _summarise_pybaselines_params(params)
+                ),
             }
 
         key = (

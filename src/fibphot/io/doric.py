@@ -13,10 +13,11 @@ from ..types import FloatArray
 
 AlignMode = Literal["truncate", "interp"]
 Source = Literal[
-    "lockin",       # demodulated photometry channels (GCaMP, Iso, etc.)
-    "analog_in",    # raw detector voltages
-    "analog_out"    # LED modulation outputs
+    "lockin",  # demodulated photometry channels (GCaMP, Iso, etc.)
+    "analog_in",  # raw detector voltages
+    "analog_out",  # LED modulation outputs
 ]
+
 
 @dataclass(frozen=True, slots=True)
 class DoricChannel:
@@ -25,8 +26,9 @@ class DoricChannel:
     time_path: str
     attrs: dict[str, Any]
 
+
 def _decode_attr(value: Any) -> Any:
-    """ Best-effort decoding for HDF5 attributes. """
+    """Best-effort decoding for HDF5 attributes."""
 
     if isinstance(value, bytes):
         return value.decode(errors="replace")
@@ -46,23 +48,27 @@ def _decode_attr(value: Any) -> Any:
 
     return value
 
+
 def _get_attrs(obj: h5py.Dataset | h5py.Group) -> dict[str, Any]:
-    """ Extract all attributes from an HDF5 group/dataset and decode them."""
+    """Extract all attributes from an HDF5 group/dataset and decode them."""
     return {k: _decode_attr(v) for k, v in obj.attrs.items()}
 
+
 def _normalise_name(name: str) -> str:
-    """ Normalise channel names so they’re consistent keys. """
+    """Normalise channel names so they’re consistent keys."""
     return name.strip().lower().replace(" ", "_").replace("-", "_")
 
+
 def _read_1d(dataset: h5py.Dataset) -> FloatArray:
-    """ Read a dataset and ensure it’s a 1D float array. """
+    """Read a dataset and ensure it’s a 1D float array."""
     arr = np.asarray(dataset[()], dtype=float)
     if arr.ndim != 1:
         raise ValueError(f"Expected 1D dataset, got shape {arr.shape}.")
     return arr
 
+
 def _discover_series_names(f: h5py.File, fpconsole: str) -> list[str]:
-    """ Find which Doric “SeriesXXXX” groups exist in the file."""
+    """Find which Doric “SeriesXXXX” groups exist in the file."""
     base = f"DataAcquisition/{fpconsole}/Signals"
     if base not in f:
         raise KeyError(f"Missing signals root: {base!r}")
@@ -73,13 +79,15 @@ def _discover_series_names(f: h5py.File, fpconsole: str) -> list[str]:
         raise ValueError(f"No series groups found under {base!r}")
     return sorted(series)
 
+
 def _series_sort_key(name: str) -> tuple[int, str]:
-    """ Sort key for series names like 'Series0001'. """
+    """Sort key for series names like 'Series0001'."""
     digits = "".join(ch for ch in name if ch.isdigit())
     return (int(digits) if digits else -1, name)
 
+
 def _choose_series(series: str | None, available: list[str]) -> str:
-    """ Decide which series to use. """
+    """Decide which series to use."""
     if series is not None:
         if series not in available:
             raise KeyError(
@@ -93,15 +101,17 @@ def _choose_series(series: str | None, available: list[str]) -> str:
     # Choose highest numbered series by default.
     return sorted(available, key=_series_sort_key)[-1]
 
+
 def _find_series_root(f: h5py.File, fpconsole: str, series: str) -> str:
-    """ Construct and validate the HDF5 path to the chosen series. """
+    """Construct and validate the HDF5 path to the chosen series."""
     root = f"DataAcquisition/{fpconsole}/Signals/{series}"
     if root not in f:
         raise KeyError(f"Could not find series root: {root!r}")
     return root
 
+
 def _available_sources(f: h5py.File, series_root: str) -> list[Source]:
-    """ Discover which source types are available in the series. """
+    """Discover which source types are available in the series."""
     out: list[Source] = []
 
     if f"{series_root}/AnalogIn" in f:
@@ -116,16 +126,19 @@ def _available_sources(f: h5py.File, series_root: str) -> list[Source]:
     order: list[Source] = ["lockin", "analog_in", "analog_out"]
     return [s for s in order if s in out]
 
+
 def _choose_source(source: Source | None, available: list[Source]) -> Source:
     """
-    Decide which source to use. 
-    
-    Priority: lockin > analog_in > analog_out. For photometry, lockin is 
+    Decide which source to use.
+
+    Priority: lockin > analog_in > analog_out. For photometry, lockin is
     preferred as it contains demodulated signals.
     """
     if source is not None:
         if source not in available:
-            raise KeyError(f"Source {source!r} not available. Available: {available}")
+            raise KeyError(
+                f"Source {source!r} not available. Available: {available}"
+            )
         return source
 
     # Priority: lockin > analog_in > analog_out
@@ -135,11 +148,11 @@ def _choose_source(source: Source | None, available: list[Source]) -> Source:
 
     raise ValueError("No supported sources found in file.")
 
+
 def _discover_lockin_channels(
-    f: h5py.File,
-    series_root: str
+    f: h5py.File, series_root: str
 ) -> list[DoricChannel]:
-    """ Discover LockIn (demodulated) channels under the series root. """
+    """Discover LockIn (demodulated) channels under the series root."""
 
     channels: list[DoricChannel] = []
 
@@ -159,7 +172,8 @@ def _discover_lockin_channels(
             continue
 
         signal_path = (
-            f"{grp_path}/AIN01" if f"{grp_path}/AIN01" in f 
+            f"{grp_path}/AIN01"
+            if f"{grp_path}/AIN01" in f
             else f"{grp_path}/{dset_names[0]}"
         )
 
@@ -168,7 +182,8 @@ def _discover_lockin_channels(
 
         username = attrs.get("Username")
         name = (
-            str(username) if username not in (None, "", "0") 
+            str(username)
+            if username not in (None, "", "0")
             else ds.name.split("/")[-1]
         )
         channels.append(
@@ -192,8 +207,9 @@ def _discover_lockin_channels(
 
     return list(dedup.values())
 
+
 def _discover_analog_in(f: h5py.File, series_root: str) -> list[DoricChannel]:
-    """ Discover analogue input channels. """
+    """Discover analogue input channels."""
 
     grp_path = f"{series_root}/AnalogIn"
     if grp_path not in f:
@@ -227,8 +243,9 @@ def _discover_analog_in(f: h5py.File, series_root: str) -> list[DoricChannel]:
 
     return channels
 
+
 def _discover_analog_out(f: h5py.File, series_root: str) -> list[DoricChannel]:
-    """ Discover analogue output channels (LED modulation outputs). """
+    """Discover analogue output channels (LED modulation outputs)."""
 
     grp_path = f"{series_root}/AnalogOut"
     if grp_path not in f:
@@ -262,6 +279,7 @@ def _discover_analog_out(f: h5py.File, series_root: str) -> list[DoricChannel]:
 
     return channels
 
+
 def _align_to_reference(
     x_ref: FloatArray,
     x: FloatArray,
@@ -284,6 +302,7 @@ def _align_to_reference(
         return np.interp(x_ref, x[:n], y[:n]).astype(float)
 
     raise ValueError(f"Unknown align mode: {mode!r}")
+
 
 def read_doric(
     filename: Path | str,

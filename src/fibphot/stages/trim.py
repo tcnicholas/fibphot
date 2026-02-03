@@ -131,7 +131,7 @@ class Trim(UpdateStage):
                 "new_n_samples": int(new_time.shape[0]),
             },
             notes=(
-                "Trimmed time/signals " 
+                "Trimmed time/signals "
                 "(and any derived arrays matching signal shape)."
             ),
             data={

@@ -45,7 +45,9 @@ def _mad_sigma(x: FloatArray) -> float:
     return 1.4826 * mad
 
 
-def _window_to_slice(state: PhotometryState, window: AnalysisWindow | None) -> slice:
+def _window_to_slice(
+    state: PhotometryState, window: AnalysisWindow | None
+) -> slice:
     if window is None:
         return slice(0, state.n_samples)
 
@@ -94,7 +96,9 @@ def _baseline_flat(y: np.ndarray, left_i: int, right_i: int) -> float:
     return float(0.5 * (y[left_i] + y[right_i]))
 
 
-def _baseline_line(x: np.ndarray, y: np.ndarray, left_i: int, right_i: int) -> np.ndarray:
+def _baseline_line(
+    x: np.ndarray, y: np.ndarray, left_i: int, right_i: int
+) -> np.ndarray:
     x0 = float(x[left_i])
     x1 = float(x[right_i])
     if np.isclose(x1, x0):
@@ -126,17 +130,23 @@ def _rmse(y: np.ndarray, yhat: np.ndarray) -> float:
     return float(np.sqrt(np.mean((y - yhat) ** 2)))
 
 
-def gaussian(x: np.ndarray, amp: float, mu: float, sigma: float, offset: float) -> np.ndarray:
+def gaussian(
+    x: np.ndarray, amp: float, mu: float, sigma: float, offset: float
+) -> np.ndarray:
     sigma = max(float(sigma), 1e-12)
     return offset + amp * np.exp(-0.5 * ((x - mu) / sigma) ** 2)
 
 
-def lorentzian(x: np.ndarray, amp: float, x0: float, gamma: float, offset: float) -> np.ndarray:
+def lorentzian(
+    x: np.ndarray, amp: float, x0: float, gamma: float, offset: float
+) -> np.ndarray:
     gamma = max(float(gamma), 1e-12)
     return offset + amp * (gamma**2) / ((x - x0) ** 2 + gamma**2)
 
 
-def alpha_transient(x: np.ndarray, amp: float, t0: float, tau: float, offset: float) -> np.ndarray:
+def alpha_transient(
+    x: np.ndarray, amp: float, t0: float, tau: float, offset: float
+) -> np.ndarray:
     tau = max(float(tau), 1e-12)
     dt = (x - t0) / tau
     out = np.full_like(x, fill_value=offset, dtype=float)
@@ -385,7 +395,9 @@ class PeakAnalysis:
 
     # SavGol options
     savgol_polyorder: int = 3
-    savgol_mode: Literal["interp", "mirror", "nearest", "constant", "wrap"] = "interp"
+    savgol_mode: Literal["interp", "mirror", "nearest", "constant", "wrap"] = (
+        "interp"
+    )
 
     # Kalman options
     kalman_model: KalmanModel = "local_level"
@@ -419,8 +431,8 @@ class PeakAnalysis:
 
     # edge selection (helps long decay peaks)
     edge_method: EdgeMethod = "prominence"
-    edge_fraction: float = 0.10      # used when edge_method="fraction"
-    edge_sigmas: float = 1.0         # used when edge_method="sigma"
+    edge_fraction: float = 0.10  # used when edge_method="fraction"
+    edge_sigmas: float = 1.0  # used when edge_method="sigma"
 
     # optional per-peak parametric fit (helpful for asymmetric peaks)
     fit_model: FitModelName | None = "alpha"
@@ -481,7 +493,9 @@ class PeakAnalysis:
                     q_scale=self.kalman_q_scale,
                 )
             else:
-                raise ValueError(f"Unknown smooth_method: {self.smooth_method!r}")
+                raise ValueError(
+                    f"Unknown smooth_method: {self.smooth_method!r}"
+                )
 
         # robust sigma estimate for auto thresholds and optional edge_method="sigma"
         sigma = _mad_sigma(y_det - np.nanmedian(y_det))
@@ -545,8 +559,10 @@ class PeakAnalysis:
             )
 
             # widths at rel_height (FWHM if rel_height=0.5)
-            widths, width_heights, left_ips, right_ips = scipy.signal.peak_widths(
-                yw, idx, rel_height=self.rel_height, wlen=self.wlen
+            widths, width_heights, left_ips, right_ips = (
+                scipy.signal.peak_widths(
+                    yw, idx, rel_height=self.rel_height, wlen=self.wlen
+                )
             )
 
             # convert fractional sample positions to x-units
@@ -584,7 +600,11 @@ class PeakAnalysis:
                             raise ValueError("edge_fraction must be in (0, 1).")
                         thr = frac * zheight
                     else:  # sigma
-                        thr = float(self.edge_sigmas) * float(sigma) if np.isfinite(sigma) else float("nan")
+                        thr = (
+                            float(self.edge_sigmas) * float(sigma)
+                            if np.isfinite(sigma)
+                            else float("nan")
+                        )
 
                     li, ri = _edge_indices_from_threshold(z, i0, thr)
                     if li is not None:
@@ -646,7 +666,12 @@ class PeakAnalysis:
                         assert base_line is not None
                         ycorr2 = ys2 - base_line[lo2:hi2]
                     peak_i_local = int(i0 - lo2)
-                    r, d = _half_height_times(xs2, ycorr2, peak_i_local, sign=1.0 if kind == "peak" else -1.0)
+                    r, d = _half_height_times(
+                        xs2,
+                        ycorr2,
+                        peak_i_local,
+                        sign=1.0 if kind == "peak" else -1.0,
+                    )
                     rise_s, decay_s = r, d
 
                 ev = PeakEvent(
@@ -711,7 +736,9 @@ class PeakAnalysis:
         return {
             "signal": self.signal,
             "kind": self.kind,
-            "window": None if self.window is None else {
+            "window": None
+            if self.window is None
+            else {
                 "start": self.window.start,
                 "end": self.window.end,
                 "ref": self.window.ref,
@@ -745,7 +772,9 @@ class PeakAnalysis:
         }
 
 
-def _events_to_arrays(events: Sequence[PeakEvent], offset: int = 0) -> dict[str, np.ndarray]:
+def _events_to_arrays(
+    events: Sequence[PeakEvent], offset: int = 0
+) -> dict[str, np.ndarray]:
     if len(events) == 0:
         return {}
 
@@ -755,30 +784,79 @@ def _events_to_arrays(events: Sequence[PeakEvent], offset: int = 0) -> dict[str,
     y = np.array([e.y for e in events], dtype=float)
 
     prominence = np.array(
-        [np.nan if e.prominence is None else float(e.prominence) for e in events],
+        [
+            np.nan if e.prominence is None else float(e.prominence)
+            for e in events
+        ],
         dtype=float,
     )
     left_base = np.array(
-        [(-1 if e.left_base_index is None else int(e.left_base_index) + offset) for e in events],
+        [
+            (
+                -1
+                if e.left_base_index is None
+                else int(e.left_base_index) + offset
+            )
+            for e in events
+        ],
         dtype=int,
     )
     right_base = np.array(
-        [(-1 if e.right_base_index is None else int(e.right_base_index) + offset) for e in events],
+        [
+            (
+                -1
+                if e.right_base_index is None
+                else int(e.right_base_index) + offset
+            )
+            for e in events
+        ],
         dtype=int,
     )
 
-    height = np.array([np.nan if e.height is None else float(e.height) for e in events], dtype=float)
-    fwhm = np.array([np.nan if e.fwhm is None else float(e.fwhm) for e in events], dtype=float)
-    left_ip = np.array([np.nan if e.left_ip is None else float(e.left_ip) for e in events], dtype=float)
-    right_ip = np.array([np.nan if e.right_ip is None else float(e.right_ip) for e in events], dtype=float)
-    rise_s = np.array([np.nan if e.rise_s is None else float(e.rise_s) for e in events], dtype=float)
-    decay_s = np.array([np.nan if e.decay_s is None else float(e.decay_s) for e in events], dtype=float)
-    area = np.array([np.nan if e.area is None else float(e.area) for e in events], dtype=float)
+    height = np.array(
+        [np.nan if e.height is None else float(e.height) for e in events],
+        dtype=float,
+    )
+    fwhm = np.array(
+        [np.nan if e.fwhm is None else float(e.fwhm) for e in events],
+        dtype=float,
+    )
+    left_ip = np.array(
+        [np.nan if e.left_ip is None else float(e.left_ip) for e in events],
+        dtype=float,
+    )
+    right_ip = np.array(
+        [np.nan if e.right_ip is None else float(e.right_ip) for e in events],
+        dtype=float,
+    )
+    rise_s = np.array(
+        [np.nan if e.rise_s is None else float(e.rise_s) for e in events],
+        dtype=float,
+    )
+    decay_s = np.array(
+        [np.nan if e.decay_s is None else float(e.decay_s) for e in events],
+        dtype=float,
+    )
+    area = np.array(
+        [np.nan if e.area is None else float(e.area) for e in events],
+        dtype=float,
+    )
 
-    fit_success = np.array([False if e.fit is None else bool(e.fit.success) for e in events], dtype=bool)
-    fit_r2 = np.array([np.nan if e.fit is None else float(e.fit.r2) for e in events], dtype=float)
-    fit_rmse = np.array([np.nan if e.fit is None else float(e.fit.rmse) for e in events], dtype=float)
-    fit_model = np.array(["" if e.fit is None else str(e.fit.model) for e in events], dtype="U12")
+    fit_success = np.array(
+        [False if e.fit is None else bool(e.fit.success) for e in events],
+        dtype=bool,
+    )
+    fit_r2 = np.array(
+        [np.nan if e.fit is None else float(e.fit.r2) for e in events],
+        dtype=float,
+    )
+    fit_rmse = np.array(
+        [np.nan if e.fit is None else float(e.fit.rmse) for e in events],
+        dtype=float,
+    )
+    fit_model = np.array(
+        ["" if e.fit is None else str(e.fit.model) for e in events], dtype="U12"
+    )
 
     # force 1D object array for params (avoids pandas “ndim > 1” error)
     fit_params = np.empty(len(events), dtype=object)
@@ -812,15 +890,30 @@ def _events_to_metrics(events: Sequence[PeakEvent]) -> dict[str, float]:
     if len(events) == 0:
         return {"n_events": 0.0}
 
-    heights = np.array([np.nan if e.height is None else float(e.height) for e in events], dtype=float)
-    areas = np.array([np.nan if e.area is None else float(e.area) for e in events], dtype=float)
-    fwhm = np.array([np.nan if e.fwhm is None else float(e.fwhm) for e in events], dtype=float)
+    heights = np.array(
+        [np.nan if e.height is None else float(e.height) for e in events],
+        dtype=float,
+    )
+    areas = np.array(
+        [np.nan if e.area is None else float(e.area) for e in events],
+        dtype=float,
+    )
+    fwhm = np.array(
+        [np.nan if e.fwhm is None else float(e.fwhm) for e in events],
+        dtype=float,
+    )
 
     return {
         "n_events": float(len(events)),
-        "mean_height": float(np.nanmean(heights)) if np.any(np.isfinite(heights)) else float("nan"),
-        "mean_area": float(np.nanmean(areas)) if np.any(np.isfinite(areas)) else float("nan"),
-        "mean_fwhm": float(np.nanmean(fwhm)) if np.any(np.isfinite(fwhm)) else float("nan"),
+        "mean_height": float(np.nanmean(heights))
+        if np.any(np.isfinite(heights))
+        else float("nan"),
+        "mean_area": float(np.nanmean(areas))
+        if np.any(np.isfinite(areas))
+        else float("nan"),
+        "mean_fwhm": float(np.nanmean(fwhm))
+        if np.any(np.isfinite(fwhm))
+        else float("nan"),
     }
 
 
@@ -878,7 +971,7 @@ def plot_peak_result(
     show_fwhm: bool = True,
     annotate: bool = False,
     show_area: bool = False,
-    area_event: int | None = None,             # which event index to highlight
+    area_event: int | None = None,  # which event index to highlight
     area_region_override: AreaRegion | None = None,  # "bases" or "fwhm"
     area_alpha: float = 0.25,
     ax=None,
@@ -897,7 +990,12 @@ def plot_peak_result(
     ax.plot(t, y, linewidth=1.2, alpha=0.9, label=label or sig)
 
     if show_window and res.window is not None and res.window.ref == "seconds":
-        ax.axvspan(float(res.window.start), float(res.window.end), alpha=0.06, color="gray")
+        ax.axvspan(
+            float(res.window.start),
+            float(res.window.end),
+            alpha=0.06,
+            color="gray",
+        )
 
     a = res.arrays
     if not a:
@@ -912,13 +1010,15 @@ def plot_peak_result(
         return fig, ax
 
     # markers
-    m_peak = (kinds == "peak")
-    m_valley = (kinds == "valley")
+    m_peak = kinds == "peak"
+    m_valley = kinds == "valley"
 
     if np.any(m_peak):
         ax.scatter(xs[m_peak], ys[m_peak], s=18, linewidth=0.0, label="peaks")
     if np.any(m_valley):
-        ax.scatter(xs[m_valley], ys[m_valley], s=18, linewidth=0.0, label="valleys")
+        ax.scatter(
+            xs[m_valley], ys[m_valley], s=18, linewidth=0.0, label="valleys"
+        )
 
     # bases markers
     if show_bases:
@@ -929,7 +1029,9 @@ def plot_peak_result(
                 lbi = int(lb[i])
                 rbi = int(rb[i])
                 if lbi >= 0 and rbi >= 0:
-                    ax.scatter([t[lbi], t[rbi]], [y[lbi], y[rbi]], marker="x", s=30)
+                    ax.scatter(
+                        [t[lbi], t[rbi]], [y[lbi], y[rbi]], marker="x", s=30
+                    )
 
     # FWHM guides
     if show_fwhm:
@@ -971,10 +1073,18 @@ def plot_peak_result(
                 if lbi >= 0 and rbi >= 0:
                     # which region do we shade?
                     params = res.params or {}
-                    area_region = area_region_override or params.get("area_region", "bases")
+                    area_region = area_region_override or params.get(
+                        "area_region", "bases"
+                    )
                     baseline_mode = params.get("baseline_mode", "line")
 
-                    if area_region == "fwhm" and li is not None and ri is not None and np.isfinite(li[i]) and np.isfinite(ri[i]):
+                    if (
+                        area_region == "fwhm"
+                        and li is not None
+                        and ri is not None
+                        and np.isfinite(li[i])
+                        and np.isfinite(ri[i])
+                    ):
                         lo = int(np.searchsorted(t, float(li[i]), side="left"))
                         hi = int(np.searchsorted(t, float(ri[i]), side="right"))
                     else:
@@ -996,7 +1106,11 @@ def plot_peak_result(
                             b_line = _baseline_line(t, y, lbi, rbi)
                             b = b_line[lo:hi]
 
-                        m = np.isfinite(xs_area) & np.isfinite(ys_area) & np.isfinite(b)
+                        m = (
+                            np.isfinite(xs_area)
+                            & np.isfinite(ys_area)
+                            & np.isfinite(b)
+                        )
                         if np.any(m):
                             # fill between baseline and trace over the integration region
                             ax.fill_between(
@@ -1004,13 +1118,23 @@ def plot_peak_result(
                                 b[m],
                                 ys_area[m],
                                 alpha=area_alpha,
-                                label="area region" if "area region" not in [h.get_label() for h in ax.get_legend_handles_labels()[0]] else None,
+                                label="area region"
+                                if "area region"
+                                not in [
+                                    h.get_label()
+                                    for h in ax.get_legend_handles_labels()[0]
+                                ]
+                                else None,
                             )
 
                             # show bounds + baseline segment (helps debugging “why did it stop early?”)
-                            ax.vlines([xs_area[m][0], xs_area[m][-1]],
-                                      ymin=np.nanmin(y), ymax=np.nanmax(y),
-                                      linestyles=":", alpha=0.35)
+                            ax.vlines(
+                                [xs_area[m][0], xs_area[m][-1]],
+                                ymin=np.nanmin(y),
+                                ymax=np.nanmax(y),
+                                linestyles=":",
+                                alpha=0.35,
+                            )
                             ax.plot(xs_area[m], b[m], linewidth=1.0, alpha=0.6)
 
                             # annotate area value (if present)

@@ -19,7 +19,12 @@ def _json_safe(obj: Any) -> Any:
     if isinstance(obj, dict):
         return {str(k): _json_safe(v) for k, v in obj.items()}
     if isinstance(obj, np.ndarray):
-        return {"__ndarray__": True, "dtype": str(obj.dtype), "shape": obj.shape, "data": obj.tolist()}
+        return {
+            "__ndarray__": True,
+            "dtype": str(obj.dtype),
+            "shape": obj.shape,
+            "data": obj.tolist(),
+        }
     return str(obj)
 
 
@@ -69,7 +74,11 @@ def save_state_h5(
         )
 
         dt = h5py.string_dtype(encoding="utf-8")
-        f.create_dataset("channel_names", data=np.array(state.channel_names, dtype=object), dtype=dt)
+        f.create_dataset(
+            "channel_names",
+            data=np.array(state.channel_names, dtype=object),
+            dtype=dt,
+        )
 
         # metadata (json)
         f.attrs["metadata_json"] = _json_dumps(state.metadata)
@@ -145,7 +154,9 @@ def load_state_h5(path: Path | str) -> PhotometryState:
             for stage_id in f["results"].keys():
                 g = f["results"][stage_id]
                 payload = _json_loads(str(g.attrs.get("json", "{}")))
-                results[str(stage_id)] = payload if isinstance(payload, dict) else {}
+                results[str(stage_id)] = (
+                    payload if isinstance(payload, dict) else {}
+                )
 
         return PhotometryState(
             time_seconds=t,
@@ -268,14 +279,18 @@ def load_collection_h5(path: Path | str) -> PhotometryCollection:
                     gg = g["summary"][stage_id]
                     name = str(gg.attrs["name"])
                     params = _json_loads(str(gg.attrs.get("params_json", "{}")))
-                    metrics = _json_loads(str(gg.attrs.get("metrics_json", "{}")))
+                    metrics = _json_loads(
+                        str(gg.attrs.get("metrics_json", "{}"))
+                    )
                     notes = gg.attrs.get("notes")
                     summary.append(
                         StageRecord(
                             stage_id=str(stage_id),
                             name=name,
                             params=params if isinstance(params, dict) else {},
-                            metrics=metrics if isinstance(metrics, dict) else {},
+                            metrics=metrics
+                            if isinstance(metrics, dict)
+                            else {},
                             notes=str(notes) if notes is not None else None,
                         )
                     )
@@ -286,7 +301,9 @@ def load_collection_h5(path: Path | str) -> PhotometryCollection:
                 for stage_id in g["results"].keys():
                     gg = g["results"][stage_id]
                     payload = _json_loads(str(gg.attrs.get("json", "{}")))
-                    results[str(stage_id)] = payload if isinstance(payload, dict) else {}
+                    results[str(stage_id)] = (
+                        payload if isinstance(payload, dict) else {}
+                    )
 
             states.append(
                 PhotometryState(

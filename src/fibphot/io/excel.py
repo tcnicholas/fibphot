@@ -10,7 +10,9 @@ from ..state import PhotometryState
 from ..types import FloatArray
 
 
-def _stack_signals(signals: Mapping[str, FloatArray]) -> tuple[FloatArray, tuple[str, ...]]:
+def _stack_signals(
+    signals: Mapping[str, FloatArray],
+) -> tuple[FloatArray, tuple[str, ...]]:
     names = tuple(str(k).lower() for k in signals)
     arrs = [np.asarray(signals[n], dtype=float) for n in signals]
     stacked = np.stack(arrs, axis=0)
@@ -21,7 +23,10 @@ def read_excel(
     filename: Path | str,
     *,
     time_column: str = "time",
-    signal_columns: Sequence[str] | Mapping[str, str] | None = ("gcamp", "isosbestic"),
+    signal_columns: Sequence[str] | Mapping[str, str] | None = (
+        "gcamp",
+        "isosbestic",
+    ),
 ) -> PhotometryState:
     """
     Read photometry data from an Excel file into a PhotometryState.
@@ -40,22 +45,32 @@ def read_excel(
 
     tcol = time_column.lower()
     if tcol not in df.columns:
-        raise ValueError(f"Missing time column '{time_column}'. Found: {df.columns}")
+        raise ValueError(
+            f"Missing time column '{time_column}'. Found: {df.columns}"
+        )
 
     if signal_columns is None:
         column_map = {c: c for c in df.columns if c != tcol}
     elif isinstance(signal_columns, Mapping):
-        column_map = {str(k).lower(): str(v).lower() for k, v in signal_columns.items()}
+        column_map = {
+            str(k).lower(): str(v).lower() for k, v in signal_columns.items()
+        }
     else:
         cols = [str(c).lower() for c in signal_columns]
         column_map = {c: c for c in cols}
 
     missing = [col for col in column_map.values() if col not in df.columns]
     if missing:
-        raise ValueError(f"Missing signal columns: {missing}. Found: {df.columns}")
+        raise ValueError(
+            f"Missing signal columns: {missing}. Found: {df.columns}"
+        )
 
-    signals_dict = {ch: df[col].to_numpy(dtype=float) for ch, col in column_map.items()}
+    signals_dict = {
+        ch: df[col].to_numpy(dtype=float) for ch, col in column_map.items()
+    }
     signals, names = _stack_signals(signals_dict)
     time_s = df[tcol].to_numpy(dtype=float)
 
-    return PhotometryState(time_seconds=time_s, signals=signals, channel_names=names)
+    return PhotometryState(
+        time_seconds=time_s, signals=signals, channel_names=names
+    )
