@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fibphot"
+version = "0.1.0"
+description = "Analysis pipeline for fibre photometry data"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "h5py>=3.15.1",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.1",
+    "openpyxl>=3.1.5",
+    "pandas>=2.3.3",
+    "pybaselines>=1.2.1",
+    "scipy>=1.17.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.14.13",
+    "pytest>=8.0",
+    "matplotlib>=3.10.8",
+]
+docs = [
+    "sphinx",
+    "pip",
+    "furo",
+    "nbsphinx",
+    "ipython",
+    "pyzmq",
+    "sphinx-autoapi",
+    "sphinx-autobuild",
+    "pydata_sphinx_theme",
+    "sphinxext-opengraph",
+    "sphinx-copybutton",
+    "sphinx-design",
+    "jupyter_sphinx",
+    "sphinx-togglebutton",
+    "sphinx_favicon",
+    "sphinx_sitemap",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 80
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
