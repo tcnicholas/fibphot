@@ -282,6 +282,35 @@ class PhotometryState:
             state = st(state)
         return state
 
+    def pipe_with_plots(
+        self,
+        *stages: Any,
+        channels: list[str] | None = None,
+        control: str | None = None,
+        title: str | None = None,
+    ) -> tuple[PhotometryState, object | None]:
+        state: PhotometryState = self
+        requested_ids: list[str] = []
+
+        for st in stages:
+            state = st(state)
+            if bool(getattr(st, "stage_plot", False)) and state.summary:
+                requested_ids.append(state.summary[-1].stage_id)
+
+        if not requested_ids:
+            return state, None
+
+        from .plotting import plot_pipeline_overview
+
+        fig, _ = plot_pipeline_overview(
+            state,
+            stage_ids=requested_ids,
+            channels=channels,
+            control=control,
+            title=title,
+        )
+        return state, fig
+
     def plot(
         self,
         *,

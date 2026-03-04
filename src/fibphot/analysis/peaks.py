@@ -966,7 +966,7 @@ def plot_peak_result(
     res: AnalysisResult,
     *,
     label: str | None = None,
-    show_window: bool = True,
+    show_window: bool = False,
     show_bases: bool = False,
     show_fwhm: bool = True,
     annotate: bool = False,
@@ -975,6 +975,8 @@ def plot_peak_result(
     area_region_override: AreaRegion | None = None,  # "bases" or "fwhm"
     area_alpha: float = 0.25,
     ax=None,
+    peak_colour: str = "C1",
+    valley_colour: str = "C0",
 ):
     import matplotlib.pyplot as plt
 
@@ -1014,10 +1016,24 @@ def plot_peak_result(
     m_valley = kinds == "valley"
 
     if np.any(m_peak):
-        ax.scatter(xs[m_peak], ys[m_peak], s=18, linewidth=0.0, label="peaks")
+        ax.scatter(
+            xs[m_peak],
+            ys[m_peak],
+            s=18,
+            linewidth=0.0,
+            label="peaks",
+            color=peak_colour,
+            zorder=10,
+        )
     if np.any(m_valley):
         ax.scatter(
-            xs[m_valley], ys[m_valley], s=18, linewidth=0.0, label="valleys"
+            xs[m_valley],
+            ys[m_valley],
+            s=18,
+            linewidth=0.0,
+            label="valleys",
+            color=valley_colour,
+            zorder=10,
         )
 
     # bases markers

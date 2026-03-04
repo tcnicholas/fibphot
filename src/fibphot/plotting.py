@@ -16,12 +16,13 @@ if TYPE_CHECKING:
 
 PlotView = Literal["current", "raw", "before_stage", "after_stage"]
 PlotMode = Literal["overlay", "stacked"]
+BaselinePanelMode = Literal["fit_on_before", "before_after"]
 
 
 @dataclass(frozen=True, slots=True)
 class PlotTheme:
     figsize: tuple[float, float] = (6.0, 3.0)
-    dpi: int = 150
+    dpi: int = 300
 
     label_size: int = 8
     tick_size: int = 8
@@ -592,3 +593,165 @@ def plot_history(
         ax0.set_title(title)
 
     return fig, ax0
+
+
+def plot_pipeline_overview(
+    state: PhotometryState,
+    *,
+    stage_ids: list[str],
+    channels: list[str] | None = None,
+    control: str | None = None,
+    baseline_panel_mode: BaselinePanelMode = "fit_on_before",
+    baseline_key: str = "double_exp_baseline",
+    theme: PlotTheme | None = None,
+    title: str | None = None,
+):
+    """
+    Multi-panel overview for selected stages.
+
+    Rows = stages (stage_ids), columns = channels.
+
+    Special-case:
+      - For DoubleExpBaseline stages, the default view is:
+            signal (before subtraction) + fitted baseline overlay
+        controlled by baseline_panel_mode="fit_on_before".
+      - Set baseline_panel_mode="before_after" to instead show before vs after.
+    """
+    theme = theme or PlotTheme()
+
+    if not stage_ids:
+        raise ValueError("stage_ids must be non-empty.")
+
+    if channels is None:
+        channels = list(state.channel_names)
+    channels = [c.lower() for c in channels]
+
+    available = set(state.channel_names)
+    channels = [c for c in channels if c in available]
+    if not channels:
+        raise ValueError(
+            "No requested channels are present in state.channel_names."
+        )
+
+    n_rows = len(stage_ids)
+    n_cols = len(channels)
+
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(
+            theme.figsize[0] * 0.5 * max(1, n_cols),
+            theme.figsize[1] * n_rows,
+        ),
+        dpi=theme.dpi,
+        sharex=True,
+        constrained_layout=True,
+        squeeze=False,
+    )
+
+    t = state.time_seconds
+
+    def _get_baseline_for_stage(stage_id: str):
+        """
+        Prefer a namespaced derived key, otherwise fall back to the global
+        baseline key.
+        """
+        k1 = f"{stage_id}:{baseline_key}"
+        if k1 in state.derived:
+            return state.derived[k1]
+        return state.derived.get(baseline_key)
+
+    for r, stage_id in enumerate(stage_ids):
+        si = _find_stage_index(
+            state, stage_name=None, stage_id=stage_id, occurrence=-1
+        )
+        before = _snapshot_at(state, si)
+        after = _snapshot_at(state, si + 1)
+
+        rec = state.summary[si]
+        row_title = f"{rec.stage_id}: {rec.name}" if rec else stage_id
+
+        is_double_exp = rec.name.lower() == "double_exp_baseline"
+
+        baseline = _get_baseline_for_stage(stage_id) if is_double_exp else None
+
+        for c, ch in enumerate(channels):
+            ax = axes[r][c]
+            _apply_theme(ax, theme)
+
+            ch_i = state.idx(ch)
+
+            if (
+                is_double_exp
+                and baseline is not None
+                and baseline_panel_mode == "fit_on_before"
+            ):
+                ax.plot(
+                    t,
+                    before[ch_i],
+                    linewidth=theme.linewidth,
+                    alpha=theme.alpha,
+                    color=theme.cycle[c % len(theme.cycle)],
+                    label="signal (before)" if (r == 0 and c == 0) else None,
+                )
+                ax.plot(
+                    t,
+                    baseline[ch_i],
+                    linewidth=2.0,
+                    alpha=0.95,
+                    color=theme.baseline_colour,
+                    label="baseline fit" if (r == 0 and c == 0) else None,
+                )
+
+            else:
+                ax.plot(
+                    t,
+                    before[ch_i],
+                    linewidth=theme.linewidth,
+                    alpha=0.55,
+                    color="0.6",
+                    label="before" if (r == 0 and c == 0) else None,
+                )
+                ax.plot(
+                    t,
+                    after[ch_i],
+                    linewidth=theme.linewidth,
+                    alpha=theme.alpha,
+                    color=theme.cycle[c % len(theme.cycle)],
+                    label="after" if (r == 0 and c == 0) else None,
+                )
+
+            if control is not None and control.lower() in available:
+                ctrl_i = state.idx(control)
+                ax.plot(
+                    t,
+                    after[ctrl_i],
+                    linewidth=max(0.9, theme.linewidth - 0.2),
+                    alpha=0.8,
+                    color=theme.control_colour,
+                    label=(
+                        f"control ({control.lower()})"
+                        if (r == 0 and c == 0)
+                        else None
+                    ),
+                )
+
+            if r == 0:
+                ax.set_title(ch)
+            if c == 0:
+                ax.set_ylabel(row_title)
+
+    handles, labels = axes[0][0].get_legend_handles_labels()
+    if handles and labels:
+        fig.legend(
+            handles,
+            labels,
+            loc="upper right",
+            frameon=False,
+            fontsize=theme.legend_size,
+        )
+
+    if title is not None:
+        fig.suptitle(title, fontsize=theme.title_size)
+
+    return fig, axes

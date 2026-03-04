@@ -134,10 +134,11 @@ def align_collection_signals(
     Align a set of states to a common time axis via interpolation.
 
     align="intersection":
-        Uses only the time interval present in all states (truncate behaviour).
+        Uses only the time interval present in all states
+        (i.e., truncate behaviour).
     align="union":
-        Uses the full time span across states and fills missing regions (pad behaviour).
-
+        Uses the full time span across states and fills missing regions
+        (i.e., pad behaviour).
     time_ref="start":
         Treats each state's time as relative to its own start time.
     time_ref="absolute":

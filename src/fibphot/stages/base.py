@@ -41,6 +41,7 @@ def _resolve_channels(
 @dataclass(frozen=True, slots=True)
 class UpdateStage(ABC):
     name: str
+    stage_plot: bool = False
 
     @abstractmethod
     def apply(self, state: PhotometryState) -> StageOutput:
