@@ -407,7 +407,10 @@ def read_doric(
         stacked = np.stack(signals, axis=0)
 
         meta: dict[str, Any] = {
-            "file": str(path),
+            "source_path": str(path),
+            "source_name": path.name,
+            "subject": path.stem.split("_", maxsplit=1)[0].lower(),
+            "reader": "doric",
             "fpconsole": fpconsole,
             "series": chosen_series,
             "available_series": series_names,

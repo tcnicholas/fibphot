@@ -139,3 +139,71 @@ class Trim(UpdateStage):
                 "history": new_history,
             },
         )
+
+
+@dataclass(frozen=True, slots=True)
+class Crop(UpdateStage):
+    """Keep only a time/sample interval.
+
+    This is intentionally distinct from :class:`Trim`: ``Trim(start, end)``
+    removes data from the beginning and end, while ``Crop(start, stop)`` keeps
+    the interval ``[start, stop]``.
+    """
+
+    name: str = field(default="crop", init=False)
+
+    start: float = 0.0
+    stop: float | None = None
+    unit: TrimUnit = "seconds"
+
+    def _params_for_summary(self) -> dict[str, Any]:
+        return {"start": self.start, "stop": self.stop, "unit": self.unit}
+
+    def apply(self, state: PhotometryState) -> StageOutput:
+        if self.start < 0:
+            raise ValueError("start must be >= 0.")
+        if self.stop is not None and self.stop < self.start:
+            raise ValueError("stop must be >= start.")
+
+        fs = state.sampling_rate
+        n0 = state.n_samples
+        lo = _as_n_samples(self.start, self.unit, fs)
+        hi = n0 if self.stop is None else _as_n_samples(self.stop, self.unit, fs)
+        lo = max(0, min(lo, n0))
+        hi = max(0, min(hi, n0))
+
+        if hi <= lo:
+            raise ValueError(
+                "Crop interval contains no samples: "
+                f"n={n0}, start={lo}, stop={hi}."
+            )
+
+        sl = slice(lo, hi)
+        new_time = state.time_seconds[sl]
+        new_signals = state.signals[:, sl]
+        new_history = (
+            state.history[:, :, sl] if state.history.size else state.history
+        )
+        new_derived = _trim_derived_like_signals(
+            state.derived,
+            n_signals=state.n_signals,
+            n_samples=state.n_samples,
+            sl=sl,
+        )
+
+        return StageOutput(
+            signals=new_signals,
+            derived=new_derived,
+            results={
+                "unit": self.unit,
+                "start": self.start,
+                "stop": self.stop,
+                "start_samples": int(lo),
+                "stop_samples": int(hi),
+                "slice": (int(lo), int(hi)),
+                "old_n_samples": int(n0),
+                "new_n_samples": int(new_time.shape[0]),
+            },
+            notes="Cropped time/signals and matching derived arrays.",
+            data={"time_seconds": new_time, "history": new_history},
+        )

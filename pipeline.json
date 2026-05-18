@@ -1,0 +1,28 @@
+{
+  "source_path": "/Users/tcnicholas/Documents/packages/fibphot/examples/latest/data/epilepsy/86R_20042026_pickuptest_0001.doric",
+  "history_policy": "raw",
+  "pipeline": [
+    {
+      "name": "Crop",
+      "params": {
+        "start": 100.0,
+        "stop": 200.0,
+        "unit": "seconds"
+      },
+      "enabled": true
+    },
+    {
+      "name": "HampelFilter",
+      "params": {
+        "window_size": 13,
+        "n_sigmas": 3.0,
+        "channels": "all",
+        "mad_scale": 1.4826,
+        "mode": "reflect",
+        "match_edges": true
+      },
+      "enabled": true
+    }
+  ],
+  "analyses": []
+}

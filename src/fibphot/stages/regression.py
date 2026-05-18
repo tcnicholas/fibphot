@@ -61,7 +61,19 @@ class IsosbesticRegression(UpdateStage):
         }
 
     def apply(self, state: PhotometryState) -> StageOutput:
-        control_idx = state.idx(self.control)
+        if self.control is None or str(self.control).strip() == "":
+            raise ValueError(
+                "No isosbestic/control channel was selected. Choose a valid "
+                "control channel before applying IsosbesticRegression."
+            )
+        try:
+            control_idx = state.idx(self.control)
+        except Exception as exc:
+            available = ", ".join(state.channel_names)
+            raise ValueError(
+                f"Control channel {self.control!r} was not found. "
+                f"Available channels: {available}."
+            ) from exc
         x = state.signals[control_idx]
 
         idxs = _resolve_channels(state, self.channels)

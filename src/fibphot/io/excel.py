@@ -72,5 +72,13 @@ def read_excel(
     time_s = df[tcol].to_numpy(dtype=float)
 
     return PhotometryState(
-        time_seconds=time_s, signals=signals, channel_names=names
+        time_seconds=time_s,
+        signals=signals,
+        channel_names=names,
+        metadata={
+            "source_path": str(path),
+            "source_name": path.name,
+            "subject": path.stem.split("_", maxsplit=1)[0].lower(),
+            "reader": "excel",
+        },
     )

@@ -31,6 +31,53 @@ class AlignedSignals:
     dt: float
 
 
+@dataclass(frozen=True, slots=True)
+class TraceStatistics:
+    """Summary statistics for a time-aligned collection of traces.
+
+    ``mean``, ``std``, ``sem`` and ``n`` all have shape
+    ``(n_channels, n_time)``.  ``aligned`` stores the full underlying stack
+    with shape ``(n_states, n_channels, n_time)`` so callers can plot either
+    individual traces, the average trace, or both.
+    """
+
+    time_seconds: FloatArray
+    mean: FloatArray
+    std: FloatArray
+    sem: FloatArray
+    n: FloatArray
+    aligned: FloatArray
+    channel_names: tuple[str, ...]
+    subjects: tuple[str | None, ...]
+    align_mode: AlignMode
+    time_ref: TimeRef
+    dt: float
+
+    @classmethod
+    def from_aligned(cls, aligned: AlignedSignals) -> "TraceStatistics":
+        mean, std, sem, n = mean_aligned(aligned)
+        return cls(
+            time_seconds=aligned.time_seconds,
+            mean=mean,
+            std=std,
+            sem=sem,
+            n=n,
+            aligned=aligned.aligned,
+            channel_names=aligned.channel_names,
+            subjects=aligned.subjects,
+            align_mode=aligned.align_mode,
+            time_ref=aligned.time_ref,
+            dt=aligned.dt,
+        )
+
+    def channel_index(self, channel: str) -> int:
+        wanted = str(channel).lower()
+        for i, name in enumerate(self.channel_names):
+            if str(name).lower() == wanted:
+                return i
+        raise KeyError(f"Unknown channel {channel!r}. Available: {self.channel_names}")
+
+
 def _as_relative_time(t: FloatArray) -> FloatArray:
     t = np.asarray(t, dtype=float)
     return t - float(t[0])
@@ -222,6 +269,12 @@ def mean_aligned(
 
     sem = std / np.sqrt(np.where(n <= 0, np.nan, n))
     return mean, std, sem, n
+
+
+def trace_statistics_from_aligned(aligned: AlignedSignals) -> TraceStatistics:
+    """Return mean/std/SEM/n while preserving the full aligned trace stack."""
+
+    return TraceStatistics.from_aligned(aligned)
 
 
 def mean_state_from_aligned(

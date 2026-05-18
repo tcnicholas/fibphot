@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
@@ -26,6 +26,7 @@ BaselineMode = Literal["line", "flat"]
 FitModelName = Literal["gaussian", "lorentzian", "alpha"]
 SmoothMethod = Literal["moving", "savgol", "kalman"]
 EdgeMethod = Literal["prominence", "fraction", "sigma"]
+TemplateKind = Literal["peak", "valley"]
 
 
 def _as_float_1d(x: FloatArray) -> np.ndarray:
@@ -43,6 +44,131 @@ def _mad_sigma(x: FloatArray) -> float:
     med = float(np.median(x))
     mad = float(np.median(np.abs(x - med)))
     return 1.4826 * mad
+
+
+def _interp_nan_1d(y: FloatArray) -> np.ndarray:
+    y = np.asarray(y, dtype=float).copy()
+    finite = np.isfinite(y)
+    if np.all(finite):
+        return y
+    if np.sum(finite) == 0:
+        return np.zeros_like(y, dtype=float)
+    x = np.arange(y.size, dtype=float)
+    y[~finite] = np.interp(x[~finite], x[finite], y[finite])
+    return y
+
+
+def biexponential_peak(
+    t: FloatArray,
+    *,
+    tau_rise: float = 0.1,
+    tau_decay: float = 0.5,
+) -> np.ndarray:
+    """Default transient template function.
+
+    This returns ``(1 - exp(-t/tau_rise)) * exp(-t/tau_decay)`` for the
+    supplied time vector. It is intentionally just a shape function; centring,
+    normalisation, duration handling and sign handling are done by
+    :func:`build_template` and :func:`matched_filter_trace`.
+    """
+    t = np.asarray(t, dtype=float)
+    tau_rise = float(tau_rise)
+    tau_decay = float(tau_decay)
+    if tau_rise <= 0 or tau_decay <= 0:
+        raise ValueError("tau_rise and tau_decay must be positive.")
+    return (1.0 - np.exp(-t / tau_rise)) * np.exp(-t / tau_decay)
+
+
+def build_template(
+    fs: float,
+    *,
+    duration: float,
+    func: Callable[..., FloatArray] = biexponential_peak,
+    template_params: Mapping[str, Any] | None = None,
+    normalise: bool = True,
+    demean: bool = True,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build a matched-filter template from an arbitrary shape function.
+
+    ``func`` must accept the template time vector as its first argument and
+    return one value per time point. Extra keyword arguments are supplied by
+    ``template_params``.
+
+    Example
+    -------
+    ``def myfunc(t, tau_rise, tau_decay): ...`` can be passed as
+    ``PeaksByTemplate(func=myfunc, template_params={...})``.
+    """
+    fs = float(fs)
+    duration = float(duration)
+    if not np.isfinite(fs) or fs <= 0:
+        raise ValueError("fs must be positive and finite.")
+    if not np.isfinite(duration) or duration <= 0:
+        raise ValueError("duration must be positive and finite.")
+
+    tt = np.arange(0.0, duration, 1.0 / fs, dtype=float)
+    if tt.size < 3:
+        raise ValueError("Template duration is too short for the sampling rate.")
+
+    params = dict(template_params or {})
+    template = np.asarray(func(tt, **params), dtype=float)
+    if template.shape != tt.shape:
+        raise ValueError(
+            "Template function must return an array with the same shape as the input time vector."
+        )
+    if not np.all(np.isfinite(template)):
+        raise ValueError("Template function returned non-finite values.")
+
+    if demean:
+        template = template - float(np.mean(template))
+    if normalise:
+        norm = float(np.linalg.norm(template))
+        if norm <= 0 or not np.isfinite(norm):
+            raise ValueError("Template function produced a flat or non-finite template.")
+        template = template / norm
+    return tt, template
+
+
+def matched_filter_trace(
+    y: FloatArray,
+    fs: float,
+    *,
+    func: Callable[..., FloatArray] = biexponential_peak,
+    template_params: Mapping[str, Any] | None = None,
+    template_duration: float = 0.6,
+    kind: TemplateKind = "peak",
+) -> tuple[np.ndarray, np.ndarray, float, float]:
+    """Return ``(corr, template, median, sigma)`` for generic template matching.
+
+    ``kind='valley'`` detects negative-going transients by applying the same
+    positive template to ``-y``. NaNs are linearly interpolated before
+    convolution because scipy's FFT convolution propagates NaNs.
+    """
+    import scipy.signal as scipy_signal
+
+    yy = _interp_nan_1d(y)
+    if kind == "valley":
+        yy = -yy
+    elif kind != "peak":
+        raise ValueError("kind must be 'peak' or 'valley'.")
+
+    _tt, template = build_template(
+        fs,
+        duration=template_duration,
+        func=func,
+        template_params=template_params,
+        normalise=True,
+        demean=True,
+    )
+    corr = scipy_signal.fftconvolve(yy, template[::-1], mode="same")
+    finite_corr = corr[np.isfinite(corr)]
+    if finite_corr.size == 0:
+        med = float("nan")
+        sigma = float("nan")
+    else:
+        med = float(np.median(finite_corr))
+        sigma = _mad_sigma(finite_corr - med)
+    return corr, template, med, sigma
 
 
 def _window_to_slice(
@@ -772,6 +898,375 @@ class PeakAnalysis:
         }
 
 
+
+def _suppress_aligned_template_duplicates(
+    records: list[dict[str, Any]], *, distance: int
+) -> list[dict[str, Any]]:
+    """Non-maximum suppression after aligning matched-filter hits.
+
+    Detection refractory is applied to the matched-filter peaks. After shifting
+    candidates to the true signal tops, separate match-score peaks can still
+    land on neighbouring samples within the refractory period. Keep the highest
+    match-score candidate in each aligned-top neighbourhood.
+    """
+    if len(records) <= 1:
+        return records
+    distance = max(1, int(distance))
+    ordered = sorted(records, key=lambda r: float(r["match_score"]), reverse=True)
+    kept: list[dict[str, Any]] = []
+    kept_idx: list[int] = []
+    for rec in ordered:
+        pi = int(rec["peak_index"])
+        if all(abs(pi - kj) >= distance for kj in kept_idx):
+            kept.append(rec)
+            kept_idx.append(pi)
+    return sorted(kept, key=lambda r: int(r["peak_index"]))
+
+
+@dataclass(frozen=True, slots=True)
+class PeaksByTemplate:
+    """Detect transient events by matched filtering against a user-defined template.
+
+    The template is supplied as a function ``func(t, **template_params)``. The
+    detector mean-centres and L2-normalises the returned template, computes a
+    matched-filter score, thresholds that score robustly using median/MAD, and
+    optionally aligns each detection to the true signal peak/valley top.
+    """
+
+    signal: str
+    func: Callable[..., FloatArray] = biexponential_peak
+    template_params: Mapping[str, Any] | None = None
+    window: AnalysisWindow | None = None
+    kind: TemplateKind = "peak"
+
+    # template construction
+    template_duration: float = 0.6
+
+    # match-score thresholding
+    match_factor: float = 1.5
+    threshold: float | None = None
+    refractory_s: float = 0.1
+
+    # alignment from matched-filter maximum to true signal top
+    align_to: Literal["peak_top", "match"] = "peak_top"
+    search_window_s: float = 1.0
+    enforce_aligned_refractory: bool = True
+
+    # amplitude rejection on the aligned true signal top
+    min_peak_amp: float | None = 0.005
+
+    # optional measurements around aligned top
+    measure_widths: bool = True
+    rel_height: float = 0.5
+    fit_model: FitModelName | None = None
+    fit_window_s: float | None = 2.0
+    fit_window_samples: int | None = None
+    fit_maxfev: int = 5000
+
+    name: str = "peaks_by_template"
+
+    def __call__(self, state: PhotometryState) -> AnalysisResult:
+        import scipy.signal as scipy_signal
+
+        if self.align_to not in {"peak_top", "match"}:
+            raise ValueError("align_to must be 'peak_top' or 'match'.")
+
+        i_sig = state.idx(self.signal)
+        t_full = _as_float_1d(state.time_seconds)
+        y_full = _as_float_1d(state.signals[i_sig])
+
+        sl = _window_to_slice(state, self.window)
+        t = t_full[sl]
+        y = y_full[sl]
+
+        if t.size < 4:
+            return AnalysisResult(
+                name=self.name,
+                channel=self.signal,
+                window=self.window,
+                params=self._params(),
+                metrics={"n_events": 0.0},
+                arrays={},
+                notes="Empty/too-small window.",
+            )
+
+        fs = _fs_from_time(t)
+        if not np.isfinite(fs) or fs <= 0:
+            fs = float(state.sampling_rate)
+        if not np.isfinite(fs) or fs <= 0:
+            raise ValueError("Could not infer a valid sampling rate.")
+
+        corr, template, med, sigma = matched_filter_trace(
+            y,
+            fs,
+            func=self.func,
+            template_params=self.template_params,
+            template_duration=self.template_duration,
+            kind=self.kind,
+        )
+
+        if self.threshold is None:
+            threshold = med + float(self.match_factor) * sigma
+        else:
+            threshold = float(self.threshold)
+
+        distance = int(max(1, round(float(self.refractory_s) * fs)))
+        match_idx, props = scipy_signal.find_peaks(
+            corr,
+            height=threshold,
+            distance=distance,
+        )
+
+        if match_idx.size == 0:
+            return AnalysisResult(
+                name=self.name,
+                channel=self.signal,
+                window=self.window,
+                params=self._params(),
+                metrics={
+                    "n_events": 0.0,
+                    "match_threshold": float(threshold),
+                    "match_median": float(med),
+                    "match_sigma_mad": float(sigma),
+                    "template_n_samples": float(template.size),
+                },
+                arrays={},
+                notes="No matched-filter scores exceeded threshold.",
+            )
+
+        y_search = _interp_nan_1d(y)
+        sign = 1.0 if self.kind == "peak" else -1.0
+
+        # ``fftconvolve(..., mode="same")`` reports the matched-filter maximum
+        # at the position where the *centre* of the reversed template overlaps
+        # the trace, not at the onset or at the biological peak top.  The old
+        # implementation searched only forwards from the match index, which can
+        # leave markers on shoulders/decays when the true top occurs before the
+        # match index.  First map the match index to the template's expected
+        # signal-top index, then align to the nearest local extremum in a
+        # symmetric window around that estimate.
+        template_peak_index = int(np.nanargmax(template))
+        same_mode_offset = int(template.size - 1 - ((template.size - 1) // 2))
+        search_half_pts = int(max(1, round(float(self.search_window_s) * fs / 2.0)))
+
+        records: list[dict[str, Any]] = []
+        seen_top_idx: set[int] = set()
+        for j, mi in enumerate(match_idx.tolist()):
+            mi = int(mi)
+            expected_top = int(mi - same_mode_offset + template_peak_index)
+            expected_top = int(np.clip(expected_top, 0, y_search.size - 1))
+
+            if self.align_to == "match":
+                top = mi
+            else:
+                start = max(0, expected_top - search_half_pts)
+                end = min(y_search.size, expected_top + search_half_pts + 1)
+                if end <= start:
+                    continue
+
+                local = sign * y_search[start:end]
+                if local.size == 0 or not np.any(np.isfinite(local)):
+                    continue
+
+                # Align to the strongest true signal extremum in the corrected
+                # search window.  Earlier versions chose the nearest local
+                # maximum to the template-predicted top; that can leave markers
+                # on shoulders during bursts.  The search window is therefore
+                # the user's explicit guard against jumping to unrelated later
+                # events: make it narrower for dense bursts, broader for slow
+                # events.
+                top = start + int(np.nanargmax(local))
+
+            # Avoid duplicate aligned tops caused by nearby match-score maxima.
+            if top in seen_top_idx:
+                continue
+
+            amp_for_filter = sign * float(y_search[top])
+            if self.min_peak_amp is not None and amp_for_filter < float(self.min_peak_amp):
+                continue
+
+            seen_top_idx.add(top)
+            records.append(
+                {
+                    "match_index": mi,
+                    "expected_peak_index": expected_top,
+                    "peak_index": int(top),
+                    "match_score": float(corr[mi]),
+                    "match_height": float(props["peak_heights"][j])
+                    if "peak_heights" in props
+                    else float(corr[mi]),
+                }
+            )
+
+        if self.enforce_aligned_refractory and records:
+            records = _suppress_aligned_template_duplicates(records, distance=distance)
+
+        if not records:
+            return AnalysisResult(
+                name=self.name,
+                channel=self.signal,
+                window=self.window,
+                params=self._params(),
+                metrics={
+                    "n_events": 0.0,
+                    "match_threshold": float(threshold),
+                    "match_median": float(med),
+                    "match_sigma_mad": float(sigma),
+                    "template_n_samples": float(template.size),
+                },
+                arrays={},
+                notes="Matched-filter candidates were rejected by alignment/amplitude filters.",
+            )
+
+        records.sort(key=lambda r: r["peak_index"])
+        events: list[PeakEvent] = []
+
+        # Optional peak-width measurements on the sign-adjusted true signal.
+        width_lookup: dict[int, dict[str, float]] = {}
+        if self.measure_widths:
+            top_idx = np.array([r["peak_index"] for r in records], dtype=int)
+            z = sign * y_search
+            try:
+                prom, left_bases, right_bases = scipy_signal.peak_prominences(z, top_idx)
+                widths, _width_heights, left_ips, right_ips = scipy_signal.peak_widths(
+                    z, top_idx, rel_height=self.rel_height
+                )
+                left_ip_x = _interp_x_at_positions(t, left_ips.astype(float))
+                right_ip_x = _interp_x_at_positions(t, right_ips.astype(float))
+                for k, pi in enumerate(top_idx.tolist()):
+                    width_lookup[int(pi)] = {
+                        "prominence": float(prom[k]),
+                        "left_base_index": float(left_bases[k]),
+                        "right_base_index": float(right_bases[k]),
+                        "fwhm": float(right_ip_x[k] - left_ip_x[k]),
+                        "left_ip": float(left_ip_x[k]),
+                        "right_ip": float(right_ip_x[k]),
+                    }
+            except Exception:  # noqa: BLE001 - width metrics are optional
+                width_lookup = {}
+
+        for rec in records:
+            i0 = int(rec["peak_index"])
+            w = width_lookup.get(i0, {})
+            ev = PeakEvent(
+                kind=self.kind,
+                index=i0,
+                x=float(t[i0]),
+                y=float(y[i0]),
+                prominence=w.get("prominence"),
+                left_base_index=int(w["left_base_index"])
+                if "left_base_index" in w
+                else None,
+                right_base_index=int(w["right_base_index"])
+                if "right_base_index" in w
+                else None,
+                height=float(sign * y[i0]),
+                fwhm=w.get("fwhm"),
+                left_ip=w.get("left_ip"),
+                right_ip=w.get("right_ip"),
+                rise_s=None,
+                decay_s=None,
+                area=None,
+                fit=None,
+            )
+            if self.fit_model is not None:
+                fit = _fit_model_to_peak(
+                    t,
+                    y,
+                    ev,
+                    model=self.fit_model,
+                    window_s=self.fit_window_s,
+                    window_samples=self.fit_window_samples,
+                    maxfev=self.fit_maxfev,
+                )
+                ev = replace(ev, fit=fit)
+            events.append(ev)
+
+        arrays = _events_to_arrays(events, offset=int(sl.start))
+        arrays.update(
+            {
+                "match_index": np.array([r["match_index"] + int(sl.start) for r in records], dtype=int),
+                "match_time_s": np.array([t[int(r["match_index"])] for r in records], dtype=float),
+                "expected_peak_index": np.array(
+                    [r["expected_peak_index"] + int(sl.start) for r in records],
+                    dtype=int,
+                ),
+                "expected_peak_time_s": np.array(
+                    [t[int(r["expected_peak_index"])] for r in records],
+                    dtype=float,
+                ),
+                "match_score": np.array([r["match_score"] for r in records], dtype=float),
+                "match_threshold": np.full(len(records), float(threshold), dtype=float),
+                "alignment_shift_s": np.array(
+                    [t[int(r["peak_index"])] - t[int(r["match_index"])] for r in records],
+                    dtype=float,
+                ),
+                "expected_to_aligned_shift_s": np.array(
+                    [
+                        t[int(r["peak_index"])] - t[int(r["expected_peak_index"])]
+                        for r in records
+                    ],
+                    dtype=float,
+                ),
+            }
+        )
+        metrics = _events_to_metrics(events)
+        metrics.update(
+            {
+                "match_threshold": float(threshold),
+                "match_median": float(med),
+                "match_sigma_mad": float(sigma),
+                "template_n_samples": float(template.size),
+                "n_match_candidates": float(match_idx.size),
+            }
+        )
+
+        return AnalysisResult(
+            name=self.name,
+            channel=self.signal,
+            window=self.window,
+            params=self._params(),
+            metrics=metrics,
+            arrays=arrays,
+            notes=(
+                "template-based matched-filter detection; match indices are "
+                "centre-corrected to the expected template top, then aligned "
+                "to nearby local signal extrema and filtered by aligned amplitude"
+            ),
+        )
+
+    def _params(self) -> dict[str, Any]:
+        func_name = getattr(self.func, "__name__", self.func.__class__.__name__)
+        return {
+            "signal": self.signal,
+            "kind": self.kind,
+            "template_function": str(func_name),
+            "template_params": dict(self.template_params or {}),
+            "window": None
+            if self.window is None
+            else {
+                "start": self.window.start,
+                "end": self.window.end,
+                "ref": self.window.ref,
+                "label": self.window.label,
+            },
+            "template_duration": self.template_duration,
+            "match_factor": self.match_factor,
+            "threshold": self.threshold,
+            "refractory_s": self.refractory_s,
+            "align_to": self.align_to,
+            "search_window_s": self.search_window_s,
+            "enforce_aligned_refractory": self.enforce_aligned_refractory,
+            "min_peak_amp": self.min_peak_amp,
+            "measure_widths": self.measure_widths,
+            "rel_height": self.rel_height,
+            "fit_model": self.fit_model,
+            "fit_window_s": self.fit_window_s,
+            "fit_window_samples": self.fit_window_samples,
+        }
+
+
+
 def _events_to_arrays(
     events: Sequence[PeakEvent], offset: int = 0
 ) -> dict[str, np.ndarray]:
@@ -1176,4 +1671,97 @@ def plot_peak_result(
     ax.set_xlabel("time (s)")
     ax.set_ylabel(sig)
     ax.legend(frameon=False, fontsize=8)
+    return fig, ax
+
+
+def plot_peaks_by_template_result(
+    state: PhotometryState,
+    res: AnalysisResult,
+    *,
+    func: Callable[..., FloatArray] = biexponential_peak,
+    template_params: Mapping[str, Any] | None = None,
+    zoom: tuple[float, float] | None = None,
+    show_match_score: bool = False,
+    ax=None,
+    score_ax=None,
+    peak_colour: str = "C3",
+):
+    """Plot template-based peak detections.
+
+    If ``show_match_score=True``, the matched-filter score is recomputed. For
+    custom templates, pass the same ``func`` and ``template_params`` used for
+    :class:`PeaksByTemplate`. The full score trace is intentionally not stored
+    in ``AnalysisResult.arrays`` so event-row exports stay tidy and compact.
+    """
+    import matplotlib.pyplot as plt
+
+    sig_name = res.channel
+    t_full = np.asarray(state.time_seconds, dtype=float)
+    y_full = np.asarray(state.channel(sig_name), dtype=float)
+
+    sl = _window_to_slice(state, res.window)
+    t = t_full[sl]
+    y = y_full[sl]
+
+    if ax is None:
+        if show_match_score:
+            fig, (ax, score_ax) = plt.subplots(2, 1, figsize=(8, 4.5), dpi=150, sharex=True)
+        else:
+            fig, ax = plt.subplots(figsize=(8, 3), dpi=150)
+    else:
+        fig = ax.figure
+
+    ax.plot(t, y, linewidth=1.1, alpha=0.9, label=sig_name)
+
+    a = res.arrays
+    xs = a.get("x")
+    ys = a.get("y")
+    if xs is not None and ys is not None and len(xs):
+        ax.scatter(xs, ys, s=28, color=peak_colour, zorder=10, label="events")
+
+    if zoom is not None:
+        ax.set_xlim(float(zoom[0]), float(zoom[1]))
+    elif res.window is not None and res.window.ref == "seconds":
+        ax.set_xlim(float(res.window.start), float(res.window.end))
+
+    ax.set_ylabel(sig_name)
+    ax.legend(frameon=False, fontsize=8)
+
+    if show_match_score:
+        if score_ax is None:
+            score_ax = ax.twinx()
+        params = res.params or {}
+        fs = _fs_from_time(t)
+        if not np.isfinite(fs) or fs <= 0:
+            fs = float(state.sampling_rate)
+
+        if template_params is None:
+            stored_template_params = params.get("template_params", {})
+            template_params = (
+                stored_template_params
+                if isinstance(stored_template_params, Mapping)
+                else {}
+            )
+
+        corr, _template, med, sigma = matched_filter_trace(
+            y,
+            fs,
+            func=func,
+            template_params=template_params,
+            template_duration=float(params.get("template_duration", 0.6)),
+            kind=params.get("kind", "peak"),
+        )
+        threshold = res.metrics.get("match_threshold")
+        if threshold is None or not np.isfinite(threshold):
+            threshold = med + float(params.get("match_factor", 1.5)) * sigma
+        score_ax.plot(t, corr, linewidth=1.0, alpha=0.9, label="match score")
+        score_ax.axhline(float(threshold), linestyle="--", linewidth=1.0, color=peak_colour)
+        score_ax.set_ylabel("match score")
+        score_ax.set_xlabel("time (s)")
+        if zoom is not None:
+            score_ax.set_xlim(float(zoom[0]), float(zoom[1]))
+        score_ax.legend(frameon=False, fontsize=8)
+    else:
+        ax.set_xlabel("time (s)")
+
     return fig, ax

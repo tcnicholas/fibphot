@@ -7,7 +7,7 @@ name = "fibphot"
 version = "0.1.4"
 description = "Analysis pipeline for fibre photometry data"
 readme = "README.md"
-authors = [{ name = "Thomas Nicholas", email = "tcnicholas@me.com" }]
+authors = [{ name = "Thomas Nicholas" }]
 license = { file = "LICENSE" }
 classifiers = [
     "License :: OSI Approved :: MIT License",
@@ -23,6 +23,7 @@ dependencies = [
     "pandas>=2.3.3",
     "pybaselines>=1.2.1",
     "scipy>=1.17.0",
+    "statsmodels>=0.14.6",
 ]
 
 [tool.setuptools]
@@ -30,9 +31,6 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-topo_metrics = ["RingStatistics/**/*"]
 
 [project.urls]
 Homepage = "https://github.com/tcnicholas/fibphot"
@@ -62,6 +60,13 @@ docs = [
     "sphinx_favicon",
     "sphinx_sitemap",
 ]
+gui = [
+  "panel>=1.4",
+  "bokeh>=3.4",
+]
+
+[project.scripts]
+fibphot-gui = "fibphot.gui.app:main"
 
 [tool.bumpver]
 current_version = "0.1.4"
