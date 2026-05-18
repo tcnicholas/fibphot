@@ -68,6 +68,92 @@ def _split_payload(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, n
     return meta, arrays
 
 
+def _is_string_array(arr: np.ndarray) -> bool:
+    """Return True for arrays that should be stored as UTF-8 strings.
+
+    h5py cannot write NumPy unicode arrays, e.g. dtype("<U12"), via the
+    ordinary numeric dataset path.  Result payloads often contain small string
+    arrays such as aligned channel names, so handle those explicitly.
+    """
+
+    arr = np.asarray(arr)
+    if arr.dtype.kind in {"U", "S"}:
+        return True
+    if arr.dtype.kind != "O":
+        return False
+    flat = arr.ravel()
+    return all(
+        x is None or isinstance(x, str | bytes | np.str_ | np.bytes_)
+        for x in flat
+    )
+
+
+def _string_dataset_data(arr: np.ndarray) -> np.ndarray:
+    """Convert a string-like array to an object array acceptable to h5py."""
+
+    arr = np.asarray(arr)
+    if arr.shape == ():
+        value = arr.item()
+        return np.asarray("" if value is None else _decode_str(value), dtype=object)
+    out = np.empty(arr.shape, dtype=object)
+    for idx, value in np.ndenumerate(arr):
+        out[idx] = "" if value is None else _decode_str(value)
+    return out
+
+
+def _write_array_dataset(
+    group: Any,
+    name: str,
+    arr: np.ndarray,
+    *,
+    compression: str | None,
+    compression_opts: int,
+) -> None:
+    """Write numeric or string arrays robustly to HDF5."""
+
+    h5py = _require_h5py()
+    arr = np.asarray(arr)
+    if _is_string_array(arr):
+        # Variable-length UTF-8 strings are not NumPy numeric arrays.  Store
+        # without compression for maximum h5py/HDF5 compatibility.
+        group.create_dataset(
+            name,
+            data=_string_dataset_data(arr),
+            dtype=h5py.string_dtype(encoding="utf-8"),
+        )
+        group[name].attrs["fibphot_dtype"] = "str"
+        return
+
+    if arr.dtype.kind == "O":
+        # Last-resort protection for object arrays in result payloads.  Rather
+        # than crashing during session save, preserve a JSON-safe string
+        # representation.  Numeric and normal string arrays use the paths above.
+        encoded = np.asarray([json.dumps(_json_safe(x), ensure_ascii=False) for x in arr.ravel()], dtype=object).reshape(arr.shape)
+        group.create_dataset(
+            name,
+            data=encoded,
+            dtype=h5py.string_dtype(encoding="utf-8"),
+        )
+        group[name].attrs["fibphot_dtype"] = "json_str"
+        return
+
+    group.create_dataset(
+        name,
+        data=arr,
+        **_compression_kwargs(compression, compression_opts),
+    )
+
+
+def _decode_string_array(arr: np.ndarray) -> np.ndarray:
+    arr = np.asarray(arr)
+    if arr.shape == ():
+        return np.asarray(_decode_str(arr.item()))
+    out = np.empty(arr.shape, dtype=object)
+    for idx, value in np.ndenumerate(arr):
+        out[idx] = _decode_str(value)
+    return out.astype(str)
+
+
 def _write_payload_group(g: Any, payload: dict[str, Any], *, compression: str | None, compression_opts: int) -> None:
     meta, arrays = _split_payload(payload)
     g.attrs["attrs_json"] = _json_dumps(meta)
@@ -77,14 +163,27 @@ def _write_payload_group(g: Any, payload: dict[str, Any], *, compression: str | 
         gg = ga
         for part in parts[:-1]:
             gg = gg.require_group(part)
-        gg.create_dataset(parts[-1], data=np.asarray(arr), **_compression_kwargs(compression, compression_opts))
+        _write_array_dataset(
+            gg,
+            parts[-1],
+            np.asarray(arr),
+            compression=compression,
+            compression_opts=compression_opts,
+        )
 
 
 def _read_arrays_group(g: Any) -> dict[str, np.ndarray]:
     out: dict[str, np.ndarray] = {}
+
     def visit(name: str, obj: Any) -> None:
         if hasattr(obj, "shape"):
-            out[name] = np.asarray(obj)
+            arr = np.asarray(obj)
+            kind = _decode_str(obj.attrs.get("fibphot_dtype", ""))
+            if kind in {"str", "json_str"} or arr.dtype.kind in {"S", "O"}:
+                out[name] = _decode_string_array(arr)
+            else:
+                out[name] = arr
+
     g.visititems(visit)
     return out
 

@@ -15,7 +15,7 @@ We recommend working in a Python environment. With conda:
 conda create -n fibphot26 python=3.12
 conda activate fibphot26
 
-python3 -m pip install fibphot
+python3 -m pip install --upgrade "fibphot[gui]"
 ```
 
 ## Relevant sources and related packages/code
