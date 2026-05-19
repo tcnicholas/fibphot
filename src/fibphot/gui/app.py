@@ -15,6 +15,7 @@ from .registry import (
 from .session import GuiSession
 from .widgets import ParameterEditor
 
+
 APP_CSS = """
 :root {
   --fibphot-bg: #f5f7fb;
@@ -75,7 +76,6 @@ html, body, .bk-root {
   border-right: 1px solid var(--fibphot-border);
   background: #f8fafc;
   flex: 0 0 auto !important;
-  resize: horizontal;
 }
 
 .fibphot-sidebar > * {
@@ -97,6 +97,15 @@ html, body, .bk-root {
 }
 .fibphot-sidebar .bk-Row {
   min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.fibphot-sidebar .bk-btn {
+  max-width: 100% !important;
+  white-space: normal !important;
+}
+.fibphot-session-actions .bk-btn {
+  flex: 1 1 auto !important;
 }
 .fibphot-sidebar .fibphot-card {
   overflow-x: hidden;
@@ -126,6 +135,8 @@ html, body, .bk-root {
   background: var(--fibphot-surface);
   box-shadow: 0 8px 22px rgba(24, 36, 51, 0.055);
   overflow: hidden;
+  min-width: 0;
+  min-height: 0;
 }
 .fibphot-card .card-header,
 .fibphot-card .accordion-header,
@@ -135,13 +146,39 @@ html, body, .bk-root {
   color: var(--fibphot-primary-dark);
   font-weight: 650;
 }
-.fibphot-plot-panel {
-  resize: vertical;
-  overflow: auto;
-  min-height: 300px;
-  height: 56vh;
-  max-height: calc(100vh - 235px);
-  flex: 0 0 auto !important;
+.fibphot-viewer-split {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.fibphot-viewer-panel {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.fibphot-viewer-header {
+  flex: 0 0 auto;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--fibphot-border);
+  background: #f8fafc;
+  color: var(--fibphot-primary-dark);
+  font-weight: 700;
+}
+.fibphot-viewer-header p { margin: 0; }
+.fibphot-viewer-controls {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--fibphot-border);
+}
+.fibphot-plot-fill {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 .fibphot-results-panel {
   overflow: auto;
@@ -159,17 +196,20 @@ html, body, .bk-root {
   color: rgba(255, 255, 255, 0.78);
   font-size: 0.84rem;
 }
-.fibphot-trace-options {
+.fibphot-trace-options,
+.fibphot-analysis-options {
   background: #ffffff;
   border: 1px solid var(--fibphot-border);
   border-radius: 12px;
   padding: 0.4rem 0.5rem 0.3rem 0.5rem;
   margin-bottom: 0.4rem;
 }
-.fibphot-trace-options .bk-tabs-header {
+.fibphot-trace-options .bk-tabs-header,
+.fibphot-analysis-options .bk-tabs-header {
   border-bottom: 1px solid var(--fibphot-border);
 }
-.fibphot-trace-options .bk-tab {
+.fibphot-trace-options .bk-tab,
+.fibphot-analysis-options .bk-tab {
   font-weight: 600;
 }
 .fibphot-compact-row {
@@ -843,12 +883,11 @@ class FibPhotGUI:
             options={"SVG (crisp/vector)": "svg", "Canvas (faster)": "canvas"},
         )
         self.trace_scope = self.pn.widgets.Select(
-            name="Trace content",
+            name="Trace viewer content",
             value="single",
             options={
                 "Current session trace": "single",
                 "Batch sessions / average": "batch",
-                "Selected analysis result": "analysis",
             },
         )
         self.batch_trace_mode = self.pn.widgets.Select(
@@ -918,6 +957,12 @@ class FibPhotGUI:
         self.plot_pane = self.pn.pane.Bokeh(
             min_height=260,
             sizing_mode="stretch_both",
+            css_classes=["fibphot-plot-fill"],
+        )
+        self.analysis_plot_pane = self.pn.pane.Bokeh(
+            min_height=260,
+            sizing_mode="stretch_both",
+            css_classes=["fibphot-plot-fill"],
         )
 
         # Pipeline widgets ----------------------------------------------------
@@ -1094,7 +1139,7 @@ class FibPhotGUI:
             value=self._empty_frame(), height=260, disabled=True
         )
         self.batch_plot_pane = self.pn.pane.Bokeh(
-            height=320, sizing_mode="stretch_width"
+            min_height=260, sizing_mode="stretch_both"
         )
 
         # Layout widgets ------------------------------------------------------
@@ -1107,10 +1152,18 @@ class FibPhotGUI:
             width=260,
         )
         self.trace_height = self.pn.widgets.IntSlider(
-            name="Trace viewer height",
+            name="Viewer row height",
             value=560,
             start=320,
             end=1200,
+            step=10,
+            width=260,
+        )
+        self.viewer_split_width = self.pn.widgets.IntSlider(
+            name="Trace viewer width",
+            value=720,
+            start=320,
+            end=1800,
             step=10,
             width=260,
         )
@@ -1122,9 +1175,11 @@ class FibPhotGUI:
         self._sidebar_container = None
         self._sidebar_splitpane = None
         self._trace_splitpane = None
+        self._viewer_splitpane = None
         self._sidebar_visible = True
         self._syncing_sidebar_width = False
         self._syncing_trace_height = False
+        self._syncing_viewer_width = False
 
         self._wire_callbacks()
         self._refresh_all()
@@ -1304,6 +1359,7 @@ class FibPhotGUI:
         )
         self.sidebar_width.param.watch(self._on_sidebar_width, "value")
         self.trace_height.param.watch(self._on_trace_height, "value")
+        self.viewer_split_width.param.watch(self._on_viewer_width, "value")
         self.sidebar_toggle_button.on_click(self._on_toggle_sidebar)
 
         self.stage_select.param.watch(self._on_stage_choice, "value")
@@ -1462,6 +1518,14 @@ class FibPhotGUI:
         ):
             splitpane.split = height
 
+    def _apply_viewer_width(self, width: int) -> None:
+        splitpane = getattr(self, "_viewer_splitpane", None)
+        if (
+            splitpane is not None
+            and int(getattr(splitpane, "split", width)) != width
+        ):
+            splitpane.split = width
+
     def _on_sidebar_width(self, *_: Any) -> None:
         if self._syncing_sidebar_width:
             return
@@ -1492,6 +1556,21 @@ class FibPhotGUI:
                 self.trace_height.value = height
             finally:
                 self._syncing_trace_height = False
+
+    def _on_viewer_width(self, *_: Any) -> None:
+        if self._syncing_viewer_width:
+            return
+        width = int(self.viewer_split_width.value or 720)
+        self._apply_viewer_width(width)
+
+    def _on_viewer_split(self, event: Any) -> None:
+        width = int(event.new or self.viewer_split_width.value or 720)
+        if int(self.viewer_split_width.value or 0) != width:
+            self._syncing_viewer_width = True
+            try:
+                self.viewer_split_width.value = width
+            finally:
+                self._syncing_viewer_width = False
 
     def _on_toggle_sidebar(self, *_: Any) -> None:
         splitpane = getattr(self, "_sidebar_splitpane", None)
@@ -2214,7 +2293,11 @@ class FibPhotGUI:
         return p
 
     def _finish_plot(
-        self, p: Any, hover_renderers: list[Any] | None = None
+        self,
+        p: Any,
+        hover_renderers: list[Any] | None = None,
+        *,
+        pane: Any | None = None,
     ) -> None:
         from bokeh.models import HoverTool
 
@@ -2237,7 +2320,13 @@ class FibPhotGUI:
             p.legend.border_line_alpha = 0.0
             p.legend.label_text_color = "#344256"
             p.legend.label_text_font_size = "8pt"
-        self.plot_pane.object = p
+        try:
+            p.sizing_mode = "stretch_both"
+        except Exception:
+            pass
+        target = pane if pane is not None else self.plot_pane
+        target.sizing_mode = "stretch_both"
+        target.object = p
 
     def _analysis_result_prefers_own_plot(self, result: Any) -> bool:
         arrays = getattr(result, "arrays", {}) or {}
@@ -2248,49 +2337,48 @@ class FibPhotGUI:
         )
 
     def _update_plot(self) -> None:
-        """Refresh the main trace pane.
+        """Refresh both visible plotting panes.
 
-        The GUI has three plotting scopes:
-        - the currently inspected session;
-        - batch overlays/averages;
-        - the selected analysis result, e.g. aligned epochs or connectivity.
-
-        This method was accidentally dropped in the previous patch while the
-        specialised plotting methods were retained, which caused the GUI to
-        fail at start-up.  Keep this as the only callback target for widgets so
-        future plot modes can be added without changing callback wiring.
+        The trace viewer is reserved for the inspected recording or batch trace
+        overlays.  The analysis viewer is reserved for the selected analysis
+        result, using a dedicated plot when possible and otherwise showing the
+        result overlaid on the session trace.
         """
         try:
             scope = str(self.trace_scope.value or "single")
-
             if scope == "batch":
-                self._update_batch_trace_plot()
-                return
-
-            if scope == "analysis":
-                result = self._selected_result()
-                if result is None:
-                    self.plot_pane.object = self._empty_trace_figure(
-                        "Run or select an analysis result to plot."
-                    )
-                    return
-                if self._update_analysis_result_plot(result):
-                    return
-                # Some analyses are naturally overlaid on the session trace
-                # rather than drawn as their own curves.
-                self._update_single_trace_plot(result_override=result)
-                return
-
-            self._update_single_trace_plot()
+                self._update_batch_trace_plot(pane=self.plot_pane)
+            else:
+                self._update_single_trace_plot(pane=self.plot_pane)
         except Exception as exc:
-            # Plotting errors should not kill the Panel session.  Show the
-            # issue in-place so the user can adjust the offending option.
             self.plot_pane.object = self._empty_trace_figure(
-                f"Plot update failed: {type(exc).__name__}: {exc}"
+                f"Trace plot update failed: {type(exc).__name__}: {exc}"
             )
 
+        try:
+            self._update_analysis_viewer_plot()
+        except Exception as exc:
+            self.analysis_plot_pane.object = self._empty_trace_figure(
+                f"Analysis plot update failed: {type(exc).__name__}: {exc}"
+            )
+
+    def _update_analysis_viewer_plot(self) -> None:
+        result = self._selected_result()
+        if result is None:
+            self.analysis_plot_pane.object = self._empty_trace_figure(
+                "Run or select an analysis result to plot here."
+            )
+            return
+        if self._update_analysis_result_plot(
+            result, pane=self.analysis_plot_pane
+        ):
+            return
+        self._update_single_trace_plot(
+            result_override=result, pane=self.analysis_plot_pane
+        )
+
     def _update_single_trace_plot(
-        self, result_override: Any | None = None
+        self, result_override: Any | None = None, *, pane: Any | None = None
     ) -> None:
         """Plot one or more channels from the currently inspected session.
 
@@ -2301,15 +2389,17 @@ class FibPhotGUI:
         """
         from bokeh.models import ColumnDataSource
 
+        target = pane if pane is not None else self.plot_pane
+
         if self.session.current_state is None:
-            self.plot_pane.object = self._empty_trace_figure(
+            target.object = self._empty_trace_figure(
                 "Load a recording, or open a processed batch session, to view traces."
             )
             return
 
         channels = self._selected_plot_channels()
         if not channels:
-            self.plot_pane.object = self._empty_trace_figure(
+            target.object = self._empty_trace_figure(
                 "Select one or more channels to plot."
             )
             return
@@ -2324,7 +2414,7 @@ class FibPhotGUI:
             if resolved is not None:
                 resolved_channels.append(resolved)
         if not resolved_channels:
-            self.plot_pane.object = self._empty_trace_figure(
+            target.object = self._empty_trace_figure(
                 "None of the selected channels are present in the current session."
             )
             return
@@ -2421,20 +2511,22 @@ class FibPhotGUI:
                     peak_dataframe=peak_df,
                 )
 
-        self._finish_plot(p, hover_renderers)
+        self._finish_plot(p, hover_renderers, pane=pane)
 
-    def _update_batch_trace_plot(self) -> None:
+    def _update_batch_trace_plot(self, *, pane: Any | None = None) -> None:
         from bokeh.models import ColumnDataSource
+
+        target = pane if pane is not None else self.plot_pane
 
         collection = self._selected_batch_collection_for_plot()
         if collection is None or not len(collection):
-            self.plot_pane.object = self._empty_trace_figure(
+            target.object = self._empty_trace_figure(
                 "Load/process a batch, then choose batch sessions or a metadata group."
             )
             return
         channel = self._primary_plot_channel()
         if not channel:
-            self.plot_pane.object = self._empty_trace_figure(
+            target.object = self._empty_trace_figure(
                 "Select a channel to plot."
             )
             return
@@ -2443,7 +2535,7 @@ class FibPhotGUI:
                 channels=[channel], align="intersection", time_ref="start"
             )
         except Exception as exc:
-            self.plot_pane.object = self._empty_trace_figure(
+            target.object = self._empty_trace_figure(
                 f"Could not align batch traces: {exc}"
             )
             return
@@ -2514,18 +2606,20 @@ class FibPhotGUI:
             )
             hover_renderers.append(r)
 
-        self._finish_plot(p, hover_renderers)
+        self._finish_plot(p, hover_renderers, pane=pane)
 
-    def _update_analysis_result_plot(self, result: Any) -> bool:
+    def _update_analysis_result_plot(
+        self, result: Any, *, pane: Any | None = None
+    ) -> bool:
         arrays = getattr(result, "arrays", {}) or {}
         mode = str(self.result_plot_mode.value or "auto")
         if mode in {"auto", "epochs"} and "aligned_traces" in arrays:
-            self._plot_aligned_epochs_result(result)
+            self._plot_aligned_epochs_result(result, pane=pane)
             return True
         if mode in {"auto", "curve"} and (
             "lag_s" in arrays or "granger_lag_s" in arrays
         ):
-            self._plot_curve_result(result)
+            self._plot_curve_result(result, pane=pane)
             return True
         if mode == "trace":
             # fall through to the normal session trace overlay
@@ -2554,20 +2648,23 @@ class FibPhotGUI:
                     break
         return selected or [(0, names[0])]
 
-    def _plot_aligned_epochs_result(self, result: Any) -> None:
+    def _plot_aligned_epochs_result(
+        self, result: Any, *, pane: Any | None = None
+    ) -> None:
         from bokeh.models import ColumnDataSource
 
+        target = pane if pane is not None else self.plot_pane
         arrays = getattr(result, "arrays", {}) or {}
         channel_info = self._aligned_channel_indices(result)
         if not channel_info:
-            self.plot_pane.object = self._empty_trace_figure(
+            target.object = self._empty_trace_figure(
                 "Selected result has no aligned channel names."
             )
             return
         t = np.asarray(arrays.get("time_relative_s"), dtype=float)
         data = np.asarray(arrays.get("aligned_traces"), dtype=float)
         if data.ndim != 3 or t.size != data.shape[2]:
-            self.plot_pane.object = self._empty_trace_figure(
+            target.object = self._empty_trace_figure(
                 "Selected result does not contain a valid aligned epoch stack."
             )
             return
@@ -2577,7 +2674,7 @@ class FibPhotGUI:
             (ci, ch) for ci, ch in channel_info if ci < data.shape[1]
         ]
         if not channel_info:
-            self.plot_pane.object = self._empty_trace_figure(
+            target.object = self._empty_trace_figure(
                 "No selected aligned channels are present in this result."
             )
             return
@@ -2680,11 +2777,14 @@ class FibPhotGUI:
                 )
                 hover_renderers.append(r)
 
-        self._finish_plot(p, hover_renderers)
+        self._finish_plot(p, hover_renderers, pane=pane)
 
-    def _plot_curve_result(self, result: Any) -> None:
+    def _plot_curve_result(
+        self, result: Any, *, pane: Any | None = None
+    ) -> None:
         from bokeh.models import ColumnDataSource
 
+        target = pane if pane is not None else self.plot_pane
         arrays = getattr(result, "arrays", {}) or {}
         hover_renderers: list[Any] = []
         p = self._new_trace_figure(
@@ -2770,7 +2870,7 @@ class FibPhotGUI:
                         legend_label=f"{label} mean correlation",
                     )
                     hover_renderers.append(r)
-            self._finish_plot(p, hover_renderers)
+            self._finish_plot(p, hover_renderers, pane=pane)
             return
 
         if "lag_s" in arrays and "corr_mean" in arrays:
@@ -2825,7 +2925,7 @@ class FibPhotGUI:
                     legend_label="mean correlation",
                 )
                 hover_renderers.append(r)
-            self._finish_plot(p, hover_renderers)
+            self._finish_plot(p, hover_renderers, pane=pane)
             return
 
         if "lag_s" in arrays and "correlation" in arrays:
@@ -2841,7 +2941,7 @@ class FibPhotGUI:
                 legend_label="correlation",
             )
             hover_renderers.append(r)
-            self._finish_plot(p, hover_renderers)
+            self._finish_plot(p, hover_renderers, pane=pane)
             return
 
         if "granger_lag_s" in arrays:
@@ -2888,7 +2988,7 @@ class FibPhotGUI:
                     text_baseline="middle",
                     text_color="#5e6b7a",
                 )
-            self._finish_plot(p, hover_renderers)
+            self._finish_plot(p, hover_renderers, pane=pane)
             return
 
         if "lag_s" in arrays and "p_x_to_y" in arrays:
@@ -2935,10 +3035,10 @@ class FibPhotGUI:
                     text_baseline="middle",
                     text_color="#5e6b7a",
                 )
-            self._finish_plot(p, hover_renderers)
+            self._finish_plot(p, hover_renderers, pane=pane)
             return
 
-        self.plot_pane.object = self._empty_trace_figure(
+        target.object = self._empty_trace_figure(
             "Selected result has no plottable lag/curve arrays."
         )
 
@@ -3060,6 +3160,7 @@ class FibPhotGUI:
     def panel(self):
         pn = self.pn
         self.plot_pane.sizing_mode = "stretch_both"
+        self.analysis_plot_pane.sizing_mode = "stretch_both"
         self.metrics_table.sizing_mode = "stretch_width"
         self.arrays_table.sizing_mode = "stretch_width"
         button_row_style = {"flex-wrap": "wrap", "gap": "0.35rem"}
@@ -3071,31 +3172,34 @@ class FibPhotGUI:
         }
 
         file_panel = pn.Card(
+            self.path_input,
             pn.Row(
-                self.path_input,
                 self.load_button,
                 sizing_mode="stretch_width",
                 styles=button_row_style,
+                css_classes=["fibphot-session-actions"],
             ),
             self.browse_input,
             self.input_file_selector,
+            self.output_dir_input,
             pn.Row(
-                self.output_dir_input,
                 self.output_dir_button,
                 sizing_mode="stretch_width",
                 styles=button_row_style,
+                css_classes=["fibphot-session-actions"],
             ),
             pn.pane.Markdown(
                 "<small>Relative export, pipeline and GUI-session paths are written under this output directory. "
                 "By default this is the directory where the GUI was launched.</small>",
                 margin=(0, 0, 4, 0),
             ),
+            self.session_file_path,
             pn.Row(
-                self.session_file_path,
                 self.save_session_button,
                 self.load_session_button,
                 sizing_mode="stretch_width",
                 styles=button_row_style,
+                css_classes=["fibphot-session-actions"],
             ),
             pn.pane.Markdown(
                 "<small>A saved fibphot GUI session stores paths, output directory, pipeline, analyses, "
@@ -3109,9 +3213,9 @@ class FibPhotGUI:
             styles=card_style,
             css_classes=["fibphot-card"],
         )
+
         settings_panel = pn.Card(
             self.sidebar_width,
-            self.trace_height,
             self.history_policy,
             title="Settings",
             collapsed=True,
@@ -3191,7 +3295,6 @@ class FibPhotGUI:
             analysis_actions,
             analysis_params_box,
             self.results_summary,
-            self.result_select,
             title="Analysis",
             collapsed=True,
             sizing_mode="stretch_width",
@@ -3291,30 +3394,21 @@ class FibPhotGUI:
             ),
             sizing_mode="stretch_width",
         )
-        analysis_trace_controls = pn.Column(
-            pn.Row(
-                self.result_plot_mode,
-                self.aligned_channel_mode,
-                sizing_mode="stretch_width",
-                styles={"flex-wrap": "wrap", "gap": "0.45rem"},
-            ),
-            pn.Row(
-                self.epoch_display,
-                self.epoch_error,
-                sizing_mode="stretch_width",
-                styles={"flex-wrap": "wrap", "gap": "0.45rem"},
-            ),
-            sizing_mode="stretch_width",
-        )
-        plot_settings_controls = pn.Column(
+        trace_plot_settings = pn.Column(
             pn.Row(
                 self.max_points,
                 self.plot_backend,
                 sizing_mode="stretch_width",
                 styles={"flex-wrap": "wrap", "gap": "0.45rem"},
             ),
+            pn.Row(
+                self.trace_height,
+                self.viewer_split_width,
+                sizing_mode="stretch_width",
+                styles={"flex-wrap": "wrap", "gap": "0.45rem"},
+            ),
             pn.pane.Markdown(
-                "<small>SVG keeps traces crisp when resized; Canvas is faster for very dense traces.</small>",
+                "<small>Drag the splitter bars for direct resizing; these controls keep the same sizes available numerically.</small>",
                 margin=(0, 0, 4, 0),
             ),
             sizing_mode="stretch_width",
@@ -3324,28 +3418,68 @@ class FibPhotGUI:
                 ("Display", display_controls),
                 ("Channels", channel_controls),
                 ("Batch", batch_controls),
-                ("Selected analysis result", analysis_trace_controls),
-                ("Plot settings", plot_settings_controls),
+                ("Plot settings", trace_plot_settings),
                 dynamic=True,
                 sizing_mode="stretch_width",
             ),
             title="Trace options",
             collapsed=False,
             sizing_mode="stretch_width",
-            css_classes=["fibphot-trace-options"],
+            css_classes=["fibphot-trace-options", "fibphot-viewer-controls"],
         )
-        plot_panel = pn.Card(
+        analysis_view_controls = pn.Card(
+            pn.Tabs(
+                (
+                    "Selected result",
+                    pn.Column(
+                        self.result_select,
+                        self.result_plot_mode,
+                        sizing_mode="stretch_width",
+                    ),
+                ),
+                (
+                    "Aligned epochs",
+                    pn.Column(
+                        self.aligned_channel_mode,
+                        pn.Row(
+                            self.epoch_display,
+                            self.epoch_error,
+                            sizing_mode="stretch_width",
+                            styles={"flex-wrap": "wrap", "gap": "0.45rem"},
+                        ),
+                        sizing_mode="stretch_width",
+                    ),
+                ),
+                dynamic=True,
+                sizing_mode="stretch_width",
+            ),
+            title="Analysis viewer options",
+            collapsed=False,
+            sizing_mode="stretch_width",
+            css_classes=["fibphot-analysis-options", "fibphot-viewer-controls"],
+        )
+
+        trace_panel = pn.Column(
+            pn.pane.Markdown(
+                "Trace viewer", css_classes=["fibphot-viewer-header"], margin=0
+            ),
             trace_controls,
             self.plot_pane,
-            title="Trace viewer",
-            collapsed=False,
             sizing_mode="stretch_both",
-            css_classes=["fibphot-card", "fibphot-plot-panel"],
-            styles={
-                "height": "100%",
-                "min-height": "0",
-                "overflow": "hidden",
-            },
+            css_classes=["fibphot-card", "fibphot-viewer-panel"],
+            styles={"height": "100%", "min-height": "0", "overflow": "hidden"},
+        )
+        analysis_viewer_panel = pn.Column(
+            pn.pane.Markdown(
+                "Analysis viewer",
+                css_classes=["fibphot-viewer-header"],
+                margin=0,
+            ),
+            analysis_view_controls,
+            self.analysis_plot_pane,
+            sizing_mode="stretch_both",
+            css_classes=["fibphot-card", "fibphot-viewer-panel"],
+            styles={"height": "100%", "min-height": "0", "overflow": "hidden"},
         )
 
         results_panel = pn.Tabs(
@@ -3385,12 +3519,26 @@ class FibPhotGUI:
         self._sidebar_container = sidebar
 
         SplitPane = _split_pane_component_type()
+        viewers = SplitPane(
+            first=trace_panel,
+            second=analysis_viewer_panel,
+            orientation="horizontal",
+            split=int(self.viewer_split_width.value),
+            min_first=360,
+            min_second=360,
+            handle_size=8,
+            sizing_mode="stretch_both",
+            css_classes=["fibphot-viewer-split"],
+        )
+        self._viewer_splitpane = viewers
+        viewers.param.watch(self._on_viewer_split, "split")
+
         main = SplitPane(
-            first=plot_panel,
+            first=viewers,
             second=results_panel,
             orientation="vertical",
             split=int(self.trace_height.value),
-            min_first=320,
+            min_first=340,
             min_second=170,
             handle_size=8,
             sizing_mode="stretch_both",
