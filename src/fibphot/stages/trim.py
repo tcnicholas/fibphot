@@ -168,7 +168,9 @@ class Crop(UpdateStage):
         fs = state.sampling_rate
         n0 = state.n_samples
         lo = _as_n_samples(self.start, self.unit, fs)
-        hi = n0 if self.stop is None else _as_n_samples(self.stop, self.unit, fs)
+        hi = (
+            n0 if self.stop is None else _as_n_samples(self.stop, self.unit, fs)
+        )
         lo = max(0, min(lo, n0))
         hi = max(0, min(hi, n0))
 

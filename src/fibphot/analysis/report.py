@@ -20,7 +20,12 @@ class AnalysisWindow:
     label: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {"start": self.start, "end": self.end, "ref": self.ref, "label": self.label}
+        return {
+            "start": self.start,
+            "end": self.end,
+            "ref": self.ref,
+            "label": self.label,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,28 +46,35 @@ class AnalysisResult:
             return self.window.label
         return f"{self.window.start}_{self.window.end}_{self.window.ref}"
 
-    def metrics_row(self, state: PhotometryState | None = None) -> dict[str, Any]:
+    def metrics_row(
+        self, state: PhotometryState | None = None
+    ) -> dict[str, Any]:
         row: dict[str, Any] = {
             "analysis": self.name,
             "channel": self.channel,
             "window": self.window_label,
         }
         if self.window is not None:
-            row.update({
-                "window_start": self.window.start,
-                "window_end": self.window.end,
-                "window_ref": self.window.ref,
-            })
+            row.update(
+                {
+                    "window_start": self.window.start,
+                    "window_end": self.window.end,
+                    "window_ref": self.window.ref,
+                }
+            )
         if state is not None:
             row.update(_state_identity(state))
         row.update(self.metrics)
         return row
 
-    def to_metrics_row(self, state: PhotometryState | None = None) -> dict[str, Any]:
+    def to_metrics_row(
+        self, state: PhotometryState | None = None
+    ) -> dict[str, Any]:
         return self.metrics_row(state)
 
     def arrays_frame(self, state: PhotometryState | None = None):
         import pandas as pd
+
         if not self.arrays:
             return pd.DataFrame()
         arrays = {k: np.asarray(v) for k, v in self.arrays.items()}
@@ -95,12 +107,16 @@ class AnalysisResult:
                 elif arr.ndim == 1:
                     if i < arr.shape[0]:
                         value = arr[i]
-                        row[key] = value.item() if np.ndim(value) == 0 else value
+                        row[key] = (
+                            value.item() if np.ndim(value) == 0 else value
+                        )
                     else:
                         row[key] = np.nan
                 elif arr.ndim == 2 and i < arr.shape[0]:
                     value = arr[i]
-                    row[key] = value.item() if np.ndim(value) == 0 else value.tolist()
+                    row[key] = (
+                        value.item() if np.ndim(value) == 0 else value.tolist()
+                    )
                 # 3D+ arrays, such as event x channel x time trace stacks, are
                 # intentionally exported through specialised long-form helpers.
             rows.append(row)
@@ -129,19 +145,25 @@ class PhotometryReport:
         return PhotometryReport(self.state, results=(*self.results, result))
 
     def extend(self, results: Iterable[AnalysisResult]) -> PhotometryReport:
-        return PhotometryReport(self.state, results=(*self.results, *tuple(results)))
+        return PhotometryReport(
+            self.state, results=(*self.results, *tuple(results))
+        )
 
     def find(self, name: str) -> tuple[AnalysisResult, ...]:
         return tuple(r for r in self.results if r.name == name)
 
     def metrics_dataframe(self):
         import pandas as pd
+
         return pd.DataFrame([r.metrics_row(self.state) for r in self.results])
 
     def arrays_dataframe(self):
         import pandas as pd
+
         frames = [r.arrays_frame(self.state) for r in self.results]
-        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        return (
+            pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        )
 
     def to_dataframe(self):
         return self.metrics_dataframe()

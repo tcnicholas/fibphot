@@ -34,8 +34,6 @@ from ..state import HistoryPolicy, PhotometryState
 from .registry import AnalysisConfig, StageConfig, create_analysis, create_stage
 
 
-
-
 def _analysis_result_to_payload(result: AnalysisResult) -> dict[str, Any]:
     return {
         "name": result.name,
@@ -101,13 +99,16 @@ def _read_results_group(group: Any) -> list[AnalysisResult]:
             results.append(_analysis_result_from_payload(payload))
     return results
 
+
 def _read_state(path: str | Path) -> PhotometryState:
     path = Path(path)
     if path.suffix.lower() in {".h5", ".hdf5"}:
         return load_state_h5(path)
     if path.suffix.lower() == ".doric":
         return read_doric(path)
-    raise ValueError(f"Unsupported input file type: {path.suffix!r}. Use .doric, .h5 or .hdf5.")
+    raise ValueError(
+        f"Unsupported input file type: {path.suffix!r}. Use .doric, .h5 or .hdf5."
+    )
 
 
 @dataclass(slots=True)
@@ -130,8 +131,12 @@ class GuiSession:
     batch_source_dir: str | None = None
     batch_errors: list[str] = field(default_factory=list)
 
-    _undo_stack: list[list[StageConfig]] = field(default_factory=list, repr=False)
-    _redo_stack: list[list[StageConfig]] = field(default_factory=list, repr=False)
+    _undo_stack: list[list[StageConfig]] = field(
+        default_factory=list, repr=False
+    )
+    _redo_stack: list[list[StageConfig]] = field(
+        default_factory=list, repr=False
+    )
 
     @property
     def loaded(self) -> bool:
@@ -182,7 +187,9 @@ class GuiSession:
         return state
 
     def _snapshot(self) -> None:
-        self._undo_stack.append([replace(c, params=dict(c.params)) for c in self.pipeline])
+        self._undo_stack.append(
+            [replace(c, params=dict(c.params)) for c in self.pipeline]
+        )
         self._redo_stack.clear()
 
     def _compute_pipeline(self, pipeline: list[StageConfig]) -> PhotometryState:
@@ -204,7 +211,9 @@ class GuiSession:
         self.errors = []
         return state
 
-    def set_pipeline(self, pipeline: list[StageConfig], *, snapshot: bool = True) -> None:
+    def set_pipeline(
+        self, pipeline: list[StageConfig], *, snapshot: bool = True
+    ) -> None:
         candidate = [replace(c, params=dict(c.params)) for c in pipeline]
         # Transactional update: validate/recompute the candidate pipeline first.
         # If it fails, keep the previous pipeline/current_state/results intact so
@@ -240,7 +249,9 @@ class GuiSession:
     def undo(self) -> bool:
         if not self._undo_stack:
             return False
-        self._redo_stack.append([replace(c, params=dict(c.params)) for c in self.pipeline])
+        self._redo_stack.append(
+            [replace(c, params=dict(c.params)) for c in self.pipeline]
+        )
         self.pipeline = self._undo_stack.pop()
         self.recompute()
         return True
@@ -248,7 +259,9 @@ class GuiSession:
     def redo(self) -> bool:
         if not self._redo_stack:
             return False
-        self._undo_stack.append([replace(c, params=dict(c.params)) for c in self.pipeline])
+        self._undo_stack.append(
+            [replace(c, params=dict(c.params)) for c in self.pipeline]
+        )
         self.pipeline = self._redo_stack.pop()
         self.recompute()
         return True
@@ -282,7 +295,9 @@ class GuiSession:
     def metrics_dataframe(self) -> pd.DataFrame:
         if self.current_state is None or not self.results:
             return pd.DataFrame()
-        return PhotometryReport(self.current_state, tuple(self.results)).metrics_dataframe()
+        return PhotometryReport(
+            self.current_state, tuple(self.results)
+        ).metrics_dataframe()
 
     def arrays_dataframe(self) -> pd.DataFrame:
         if self.current_state is None or not self.results:
@@ -302,7 +317,9 @@ class GuiSession:
                 except Exception:
                     pass
             frames.append(result.arrays_frame(self.current_state))
-        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        return (
+            pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        )
 
     # ------------------------------------------------------------------
     # Batch/multi-session workflow
@@ -316,9 +333,13 @@ class GuiSession:
         metadata_on: str = "subject",
     ) -> PhotometryCollection:
         directory = Path(directory).expanduser()
-        collection = PhotometryCollection.from_directory(directory, pattern=pattern, reader=read_doric)
+        collection = PhotometryCollection.from_directory(
+            directory, pattern=pattern, reader=read_doric
+        )
         if metadata_table:
-            collection = collection.with_metadata_table(metadata_table, on=metadata_on)
+            collection = collection.with_metadata_table(
+                metadata_table, on=metadata_on
+            )
         self.raw_collection = collection
         self.current_collection = collection
         self.batch_report = None
@@ -326,7 +347,9 @@ class GuiSession:
         self.batch_errors = []
         return collection
 
-    def recompute_batch(self, *, continue_on_error: bool = True) -> PhotometryCollection:
+    def recompute_batch(
+        self, *, continue_on_error: bool = True
+    ) -> PhotometryCollection:
         if self.raw_collection is None:
             raise RuntimeError("No batch collection is loaded.")
         stages = [create_stage(cfg) for cfg in self.pipeline if cfg.enabled]
@@ -336,26 +359,44 @@ class GuiSession:
             continue_on_error=continue_on_error,
         )
         self.current_collection = result.successful
-        self.batch_errors = [f"{f.subject or f.index}: {f.step}: {f.error_type}: {f.message}" for f in result.failed]
+        self.batch_errors = [
+            f"{f.subject or f.index}: {f.step}: {f.error_type}: {f.message}"
+            for f in result.failed
+        ]
         self.batch_report = None
         return result.successful
 
-    def run_batch_analyses(self, *, continue_on_error: bool = True) -> BatchReport:
+    def run_batch_analyses(
+        self, *, continue_on_error: bool = True
+    ) -> BatchReport:
         if self.current_collection is None:
             raise RuntimeError("No processed batch collection is available.")
-        analyses = [create_analysis(cfg) for cfg in self.analyses if cfg.enabled]
+        analyses = [
+            create_analysis(cfg) for cfg in self.analyses if cfg.enabled
+        ]
         if not analyses:
-            raise RuntimeError("No saved analyses are configured. Run or add an analysis first.")
-        report = self.current_collection.analyse(*analyses, continue_on_error=continue_on_error)
+            raise RuntimeError(
+                "No saved analyses are configured. Run or add an analysis first."
+            )
+        report = self.current_collection.analyse(
+            *analyses, continue_on_error=continue_on_error
+        )
         self.batch_report = report
-        self.batch_errors = [f"{f.subject or f.index}: {f.step}: {f.error_type}: {f.message}" for f in report.failed]
+        self.batch_errors = [
+            f"{f.subject or f.index}: {f.step}: {f.error_type}: {f.message}"
+            for f in report.failed
+        ]
         return report
 
-    def add_batch_analysis(self, config: AnalysisConfig, *, continue_on_error: bool = True) -> BatchReport:
+    def add_batch_analysis(
+        self, config: AnalysisConfig, *, continue_on_error: bool = True
+    ) -> BatchReport:
         if self.current_collection is None:
             raise RuntimeError("No processed batch collection is available.")
         self.analyses.append(config)
-        report = self.current_collection.analyse(create_analysis(config), continue_on_error=continue_on_error)
+        report = self.current_collection.analyse(
+            create_analysis(config), continue_on_error=continue_on_error
+        )
         if self.batch_report is None:
             self.batch_report = report
         else:
@@ -363,7 +404,10 @@ class GuiSession:
                 reports=(*self.batch_report.reports, *report.reports),
                 failed=(*self.batch_report.failed, *report.failed),
             )
-        self.batch_errors = [f"{f.subject or f.index}: {f.step}: {f.error_type}: {f.message}" for f in report.failed]
+        self.batch_errors = [
+            f"{f.subject or f.index}: {f.step}: {f.error_type}: {f.message}"
+            for f in report.failed
+        ]
         return report
 
     def batch_summary_dataframe(self) -> pd.DataFrame:
@@ -381,20 +425,37 @@ class GuiSession:
             return pd.DataFrame()
         return self.batch_report.arrays_dataframe()
 
-    def batch_grouped_metrics(self, groupby: str | None, values: list[str] | None = None) -> pd.DataFrame:
+    def batch_grouped_metrics(
+        self, groupby: str | None, values: list[str] | None = None
+    ) -> pd.DataFrame:
         df = self.batch_metrics_dataframe()
-        return grouped_numeric_summary(df, groupby=groupby, values=values) if not df.empty else df
+        return (
+            grouped_numeric_summary(df, groupby=groupby, values=values)
+            if not df.empty
+            else df
+        )
 
-    def select_batch_session(self, index: int, *, processed: bool = True) -> PhotometryState:
-        collection = self.current_collection if processed else self.raw_collection
+    def select_batch_session(
+        self, index: int, *, processed: bool = True
+    ) -> PhotometryState:
+        collection = (
+            self.current_collection if processed else self.raw_collection
+        )
         if collection is None:
             raise RuntimeError("No batch collection is loaded.")
         state = collection.states[int(index)]
-        self.raw_state = self.raw_collection.states[int(index)] if self.raw_collection is not None and int(index) < len(self.raw_collection.states) else state
+        self.raw_state = (
+            self.raw_collection.states[int(index)]
+            if self.raw_collection is not None
+            and int(index) < len(self.raw_collection.states)
+            else state
+        )
         self.current_state = state
         self.source_path = str(state.metadata.get("source_path", ""))
         self.results = []
-        if self.batch_report is not None and int(index) < len(self.batch_report.reports):
+        if self.batch_report is not None and int(index) < len(
+            self.batch_report.reports
+        ):
             self.results = list(self.batch_report.reports[int(index)].results)
         return state
 
@@ -497,7 +558,9 @@ class GuiSession:
                         )
                 if self.batch_report is not None:
                     g = f.create_group("batch_report")
-                    g.attrs["failed_json"] = _json_dumps([f.__dict__ for f in self.batch_report.failed])
+                    g.attrs["failed_json"] = _json_dumps(
+                        [f.__dict__ for f in self.batch_report.failed]
+                    )
                     for i, report in enumerate(self.batch_report.reports):
                         rg = g.create_group(f"report_{i:04d}")
                         _write_state_group(
@@ -526,40 +589,74 @@ class GuiSession:
         with h5py.File(p, "r") as f:
             schema = _decode_str(f.attrs.get("schema", ""))
             if schema != "fibphot_gui_session":
-                raise ValueError(f"Not a fibphot GUI session file: schema={schema!r}")
+                raise ValueError(
+                    f"Not a fibphot GUI session file: schema={schema!r}"
+                )
             payload = _json_loads(f.attrs.get("metadata_json", "{}"))
             if not isinstance(payload, dict):
                 payload = {}
             self.source_path = payload.get("source_path")
             self.output_dir = str(payload.get("output_dir") or p.parent)
-            self.history_policy = payload.get("history_policy", self.history_policy)
-            self.pipeline = [StageConfig.from_dict(x) for x in payload.get("pipeline", [])]
-            self.analyses = [AnalysisConfig.from_dict(x) for x in payload.get("analyses", [])]
+            self.history_policy = payload.get(
+                "history_policy", self.history_policy
+            )
+            self.pipeline = [
+                StageConfig.from_dict(x) for x in payload.get("pipeline", [])
+            ]
+            self.analyses = [
+                AnalysisConfig.from_dict(x) for x in payload.get("analyses", [])
+            ]
             self.batch_source_dir = payload.get("batch_source_dir")
             self.batch_errors = list(payload.get("batch_errors", []) or [])
             self.errors = list(payload.get("errors", []) or [])
-            self.raw_state = _read_state_group(f["raw_state"]) if "raw_state" in f else None
-            self.current_state = _read_state_group(f["current_state"]) if "current_state" in f else self.raw_state
-            self.results = _read_results_group(f["results"]) if "results" in f else []
+            self.raw_state = (
+                _read_state_group(f["raw_state"]) if "raw_state" in f else None
+            )
+            self.current_state = (
+                _read_state_group(f["current_state"])
+                if "current_state" in f
+                else self.raw_state
+            )
+            self.results = (
+                _read_results_group(f["results"]) if "results" in f else []
+            )
             self.raw_collection = None
             if "raw_collection" in f:
-                states = [_read_state_group(f["raw_collection"][k]) for k in sorted(f["raw_collection"].keys())]
+                states = [
+                    _read_state_group(f["raw_collection"][k])
+                    for k in sorted(f["raw_collection"].keys())
+                ]
                 self.raw_collection = PhotometryCollection.from_iterable(states)
             self.current_collection = None
             if "current_collection" in f:
-                states = [_read_state_group(f["current_collection"][k]) for k in sorted(f["current_collection"].keys())]
-                self.current_collection = PhotometryCollection.from_iterable(states)
+                states = [
+                    _read_state_group(f["current_collection"][k])
+                    for k in sorted(f["current_collection"].keys())
+                ]
+                self.current_collection = PhotometryCollection.from_iterable(
+                    states
+                )
             self.batch_report = None
             if "batch_report" in f:
                 bg = f["batch_report"]
                 reports = []
-                for key in sorted(k for k in bg.keys() if str(k).startswith("report_")):
+                for key in sorted(
+                    k for k in bg.keys() if str(k).startswith("report_")
+                ):
                     rg = bg[key]
                     st = _read_state_group(rg["state"])
-                    results = tuple(_read_results_group(rg["results"])) if "results" in rg else ()
+                    results = (
+                        tuple(_read_results_group(rg["results"]))
+                        if "results" in rg
+                        else ()
+                    )
                     reports.append(PhotometryReport(st, results))
                 failed_payload = _json_loads(bg.attrs.get("failed_json", "[]"))
-                failed = tuple(BatchFailure(**x) for x in failed_payload) if isinstance(failed_payload, list) else ()
+                failed = (
+                    tuple(BatchFailure(**x) for x in failed_payload)
+                    if isinstance(failed_payload, list)
+                    else ()
+                )
                 self.batch_report = BatchReport(tuple(reports), failed)
             self._undo_stack = []
             self._redo_stack = []
@@ -578,16 +675,24 @@ class GuiSession:
         out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return out
 
-    def load_pipeline_json(self, path: str | Path, *, recompute: bool = True) -> None:
+    def load_pipeline_json(
+        self, path: str | Path, *, recompute: bool = True
+    ) -> None:
         payload = json.loads(self.output_path(path).read_text(encoding="utf-8"))
-        self.pipeline = [StageConfig.from_dict(x) for x in payload.get("pipeline", [])]
-        self.analyses = [AnalysisConfig.from_dict(x) for x in payload.get("analyses", [])]
+        self.pipeline = [
+            StageConfig.from_dict(x) for x in payload.get("pipeline", [])
+        ]
+        self.analyses = [
+            AnalysisConfig.from_dict(x) for x in payload.get("analyses", [])
+        ]
         self.history_policy = payload.get("history_policy", self.history_policy)
         if recompute and self.raw_state is not None:
             self.recompute()
             self.rerun_analyses()
 
-    def export(self, directory: str | Path, *, include_state: bool = True) -> dict[str, Path]:
+    def export(
+        self, directory: str | Path, *, include_state: bool = True
+    ) -> dict[str, Path]:
         directory = self.output_path(directory)
         directory.mkdir(parents=True, exist_ok=True)
         written: dict[str, Path] = {}

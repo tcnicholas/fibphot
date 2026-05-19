@@ -16,37 +16,57 @@ def _window_to_mask(t: np.ndarray, window: AnalysisWindow | None) -> np.ndarray:
     if window is None:
         return np.isfinite(t)
     if window.ref != "seconds":
-        i0 = max(0, int(window.start)); i1 = min(t.size, int(window.end))
-        m = np.zeros_like(t, dtype=bool); m[i0:i1] = True
+        i0 = max(0, int(window.start))
+        i1 = min(t.size, int(window.end))
+        m = np.zeros_like(t, dtype=bool)
+        m[i0:i1] = True
         return m & np.isfinite(t)
-    lo = float(min(window.start, window.end)); hi = float(max(window.start, window.end))
+    lo = float(min(window.start, window.end))
+    hi = float(max(window.start, window.end))
     return np.isfinite(t) & (t >= lo) & (t <= hi)
 
 
 def _safe_detrend(x: np.ndarray) -> np.ndarray:
     from scipy.signal import detrend
+
     arr = np.asarray(x, dtype=float)
     if arr.size < 3 or np.sum(np.isfinite(arr)) < 3:
         return arr - np.nanmean(arr)
     good = np.isfinite(arr)
     if not np.all(good):
         idx = np.arange(arr.size, dtype=float)
-        arr = arr.copy(); arr[~good] = np.interp(idx[~good], idx[good], arr[good])
+        arr = arr.copy()
+        arr[~good] = np.interp(idx[~good], idx[good], arr[good])
     return detrend(arr)
 
 
-def cross_correlation(x: Sequence[float], y: Sequence[float], *, dt: float, max_lag_s: float | None = None, detrend: bool = True, normalise: bool = True) -> tuple[np.ndarray, np.ndarray]:
+def cross_correlation(
+    x: Sequence[float],
+    y: Sequence[float],
+    *,
+    dt: float,
+    max_lag_s: float | None = None,
+    detrend: bool = True,
+    normalise: bool = True,
+) -> tuple[np.ndarray, np.ndarray]:
     from scipy.signal import correlate, correlation_lags
-    a = np.asarray(x, dtype=float); b = np.asarray(y, dtype=float)
-    n = min(a.size, b.size); a = a[:n]; b = b[:n]
+
+    a = np.asarray(x, dtype=float)
+    b = np.asarray(y, dtype=float)
+    n = min(a.size, b.size)
+    a = a[:n]
+    b = b[:n]
     m = np.isfinite(a) & np.isfinite(b)
     if np.sum(m) < 3:
         return np.array([], dtype=float), np.array([], dtype=float)
-    a = a[m]; b = b[m]
+    a = a[m]
+    b = b[m]
     if detrend:
-        a = _safe_detrend(a); b = _safe_detrend(b)
+        a = _safe_detrend(a)
+        b = _safe_detrend(b)
     else:
-        a = a - np.nanmean(a); b = b - np.nanmean(b)
+        a = a - np.nanmean(a)
+        b = b - np.nanmean(b)
     corr = correlate(a, b, mode="full")
     if normalise:
         denom = float(np.sqrt(np.sum(a * a) * np.sum(b * b)))
@@ -54,19 +74,28 @@ def cross_correlation(x: Sequence[float], y: Sequence[float], *, dt: float, max_
             corr = corr / denom
     lags = correlation_lags(a.size, b.size, mode="full") * float(dt)
     if max_lag_s is not None:
-        keep = np.abs(lags) <= float(max_lag_s); lags = lags[keep]; corr = corr[keep]
+        keep = np.abs(lags) <= float(max_lag_s)
+        lags = lags[keep]
+        corr = corr[keep]
     return lags.astype(float), corr.astype(float)
 
 
 def _fdr_bh(p: np.ndarray) -> np.ndarray:
     p = np.asarray(p, dtype=float)
     out = np.full_like(p, np.nan, dtype=float)
-    finite = np.isfinite(p); vals = p[finite]
+    finite = np.isfinite(p)
+    vals = p[finite]
     if vals.size == 0:
         return out
-    order = np.argsort(vals); ranked = vals[order]; n = ranked.size
-    adj = ranked * n / np.arange(1, n + 1); adj = np.minimum.accumulate(adj[::-1])[::-1]; adj = np.clip(adj, 0, 1)
-    tmp = np.empty_like(adj); tmp[order] = adj; out[finite] = tmp
+    order = np.argsort(vals)
+    ranked = vals[order]
+    n = ranked.size
+    adj = ranked * n / np.arange(1, n + 1)
+    adj = np.minimum.accumulate(adj[::-1])[::-1]
+    adj = np.clip(adj, 0, 1)
+    tmp = np.empty_like(adj)
+    tmp[order] = adj
+    out[finite] = tmp
     return out
 
 
@@ -96,7 +125,9 @@ def _run_granger_once(data: np.ndarray, maxlag: int) -> list[float]:
     try:
         from statsmodels.tsa.stattools import grangercausalitytests
     except Exception as exc:
-        raise ImportError("Granger causality requires statsmodels. Install `statsmodels`.") from exc
+        raise ImportError(
+            "Granger causality requires statsmodels. Install `statsmodels`."
+        ) from exc
 
     arr = np.asarray(data, dtype=float)
     if arr.ndim != 2 or arr.shape[1] != 2 or arr.shape[0] < 8:
@@ -118,11 +149,19 @@ def _run_granger_once(data: np.ndarray, maxlag: int) -> list[float]:
     for lag_max in range(requested, 0, -1):
         try:
             with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", message="verbose is deprecated", category=FutureWarning)
+                warnings.filterwarnings(
+                    "ignore",
+                    message="verbose is deprecated",
+                    category=FutureWarning,
+                )
                 warnings.filterwarnings("ignore", category=RuntimeWarning)
                 try:
-                    results = grangercausalitytests(arr, maxlag=lag_max, verbose=False)
-                except TypeError:  # statsmodels versions where ``verbose`` has changed.
+                    results = grangercausalitytests(
+                        arr, maxlag=lag_max, verbose=False
+                    )
+                except (
+                    TypeError
+                ):  # statsmodels versions where ``verbose`` has changed.
                     results = grangercausalitytests(arr, maxlag=lag_max)
             p_values: list[float] = []
             for lag in range(1, lag_max + 1):
@@ -133,7 +172,9 @@ def _run_granger_once(data: np.ndarray, maxlag: int) -> list[float]:
             if lag_max < requested:
                 p_values.extend([np.nan] * (requested - lag_max))
             return p_values
-        except Exception as exc:  # progressively reduce lag rather than failing the GUI plot.
+        except (
+            Exception
+        ) as exc:  # progressively reduce lag rather than failing the GUI plot.
             last_error = exc
             continue
 
@@ -184,7 +225,11 @@ def granger_pvalues(
         b = b[::factor]
         dt2 *= factor
 
-    if max_samples is not None and max_samples > 0 and a.size > int(max_samples):
+    if (
+        max_samples is not None
+        and max_samples > 0
+        and a.size > int(max_samples)
+    ):
         factor = int(np.ceil(a.size / int(max_samples)))
         a = a[::factor]
         b = b[::factor]
@@ -200,7 +245,11 @@ def granger_pvalues(
     if n < 12:
         return _empty_granger_result()
 
-    maxlag_time = int(np.floor(float(max_lag_s) / dt2)) if max_lag_s is not None else n // 3
+    maxlag_time = (
+        int(np.floor(float(max_lag_s) / dt2))
+        if max_lag_s is not None
+        else n // 3
+    )
     maxlag_possible = max(1, min(n // 3, n - 5))
     maxlag = min(maxlag_time, maxlag_possible)
     if max_lag_steps is not None and int(max_lag_steps) > 0:
@@ -241,15 +290,40 @@ class CrossCorrelationAnalysis:
     name: str = "cross_correlation"
 
     def __call__(self, state: PhotometryState) -> AnalysisResult:
-        t = np.asarray(state.time_seconds, dtype=float); m = _window_to_mask(t, self.window)
-        x = np.asarray(state.channel(self.x_signal), dtype=float)[m]; y = np.asarray(state.channel(self.y_signal), dtype=float)[m]; tt = t[m]
-        dt = float(np.nanmedian(np.diff(tt))) if tt.size >= 2 else 1.0 / state.sampling_rate
-        lags, corr = cross_correlation(x, y, dt=dt, max_lag_s=self.max_lag_s, detrend=self.detrend, normalise=self.normalise)
+        t = np.asarray(state.time_seconds, dtype=float)
+        m = _window_to_mask(t, self.window)
+        x = np.asarray(state.channel(self.x_signal), dtype=float)[m]
+        y = np.asarray(state.channel(self.y_signal), dtype=float)[m]
+        tt = t[m]
+        dt = (
+            float(np.nanmedian(np.diff(tt)))
+            if tt.size >= 2
+            else 1.0 / state.sampling_rate
+        )
+        lags, corr = cross_correlation(
+            x,
+            y,
+            dt=dt,
+            max_lag_s=self.max_lag_s,
+            detrend=self.detrend,
+            normalise=self.normalise,
+        )
         if corr.size:
-            imax = int(np.nanargmax(np.abs(corr))); metrics = {"max_abs_corr": float(corr[imax]), "lag_at_max_abs_corr_s": float(lags[imax])}
+            imax = int(np.nanargmax(np.abs(corr)))
+            metrics = {
+                "max_abs_corr": float(corr[imax]),
+                "lag_at_max_abs_corr_s": float(lags[imax]),
+            }
         else:
             metrics = {"max_abs_corr": np.nan, "lag_at_max_abs_corr_s": np.nan}
-        return AnalysisResult(self.name, f"{self.x_signal},{self.y_signal}", self.window, asdict(self), metrics, {"lag_s": lags, "correlation": corr})
+        return AnalysisResult(
+            self.name,
+            f"{self.x_signal},{self.y_signal}",
+            self.window,
+            asdict(self),
+            metrics,
+            {"lag_s": lags, "correlation": corr},
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -272,7 +346,11 @@ class GrangerCausalityAnalysis:
         x = np.asarray(state.channel(self.x_signal), dtype=float)[m]
         y = np.asarray(state.channel(self.y_signal), dtype=float)[m]
         tt = t[m]
-        dt = float(np.nanmedian(np.diff(tt))) if tt.size >= 2 else 1.0 / state.sampling_rate
+        dt = (
+            float(np.nanmedian(np.diff(tt)))
+            if tt.size >= 2
+            else 1.0 / state.sampling_rate
+        )
         out = granger_pvalues(
             x,
             y,
@@ -286,10 +364,16 @@ class GrangerCausalityAnalysis:
             fdr=self.fdr,
         )
         metrics = {
-            "min_p_x_to_y": float(np.nanmin(out["p_x_to_y"])) if out["p_x_to_y"].size else np.nan,
-            "min_p_y_to_x": float(np.nanmin(out["p_y_to_x"])) if out["p_y_to_x"].size else np.nan,
+            "min_p_x_to_y": float(np.nanmin(out["p_x_to_y"]))
+            if out["p_x_to_y"].size
+            else np.nan,
+            "min_p_y_to_x": float(np.nanmin(out["p_y_to_x"]))
+            if out["p_y_to_x"].size
+            else np.nan,
             "n_lags_tested": float(out["lag_s"].size),
-            "effective_max_lag_s": float(out["lag_s"][-1]) if out["lag_s"].size else np.nan,
+            "effective_max_lag_s": float(out["lag_s"][-1])
+            if out["lag_s"].size
+            else np.nan,
         }
         return AnalysisResult(
             self.name,
@@ -312,7 +396,9 @@ def _normalise_channels_for_state(
     if channels is None or channels == "all":
         requested: list[str] = list(state.channel_names)
     elif isinstance(channels, str):
-        requested = [c.strip().lower() for c in channels.split(",") if c.strip()]
+        requested = [
+            c.strip().lower() for c in channels.split(",") if c.strip()
+        ]
     else:
         requested = [str(c).strip().lower() for c in channels if str(c).strip()]
 
@@ -327,7 +413,9 @@ def _normalise_channels_for_state(
         try:
             idx = state.idx(name)
         except Exception:
-            raise KeyError(f"Unknown channel {name!r}. Available: {state.channel_names}") from None
+            raise KeyError(
+                f"Unknown channel {name!r}. Available: {state.channel_names}"
+            ) from None
         actual = state.channel_names[idx]
         if actual not in valid:
             valid.append(actual)
@@ -345,7 +433,11 @@ def _parse_pairs(
     if pairs is None or pairs == "":
         return ()
     if isinstance(pairs, str):
-        chunks = [c.strip() for c in pairs.replace(";", "\n").splitlines() if c.strip()]
+        chunks = [
+            c.strip()
+            for c in pairs.replace(";", "\n").splitlines()
+            if c.strip()
+        ]
         out: list[tuple[str, str]] = []
         for chunk in chunks:
             sep = ":" if ":" in chunk else ","
@@ -360,12 +452,16 @@ def _parse_pairs(
     out = []
     for pair in pairs:
         if len(pair) != 2:
-            raise ValueError("Each connectivity pair must contain exactly two channel names.")
+            raise ValueError(
+                "Each connectivity pair must contain exactly two channel names."
+            )
         out.append((str(pair[0]).strip().lower(), str(pair[1]).strip().lower()))
     return tuple(out)
 
 
-def _default_event_pairs(event_signal: str, channels: Sequence[str]) -> tuple[tuple[str, str], ...]:
+def _default_event_pairs(
+    event_signal: str, channels: Sequence[str]
+) -> tuple[tuple[str, str], ...]:
     event = event_signal.lower()
     pairs = []
     for channel in channels:
@@ -427,7 +523,9 @@ class PeakAlignedConnectivityAnalysis:
 
     def __call__(self, state: PhotometryState) -> AnalysisResult:
         include = [self.event_signal, self.x_signal, self.y_signal]
-        channels = _normalise_channels_for_state(self.channels, state, include=include)
+        channels = _normalise_channels_for_state(
+            self.channels, state, include=include
+        )
 
         avg = PeakTriggeredAverage(
             event_signal=self.event_signal,
@@ -481,10 +579,16 @@ class PeakAlignedConnectivityAnalysis:
             {
                 "time_relative_s": aligned.time_relative_s,
                 "event_time_s": aligned.event_times_s,
-                "aligned_channel_names": np.asarray(aligned.channel_names, dtype=str),
+                "aligned_channel_names": np.asarray(
+                    aligned.channel_names, dtype=str
+                ),
                 "aligned_traces": aligned.data,
-                "alignment_event_signal": np.asarray([self.event_signal.lower()], dtype=str),
-                "connectivity_pair_labels": np.asarray([f"{a}->{b}" for a, b in valid_pairs], dtype=str),
+                "alignment_event_signal": np.asarray(
+                    [self.event_signal.lower()], dtype=str
+                ),
+                "connectivity_pair_labels": np.asarray(
+                    [f"{a}->{b}" for a, b in valid_pairs], dtype=str
+                ),
             }
         )
         metrics: dict[str, Any] = {
@@ -521,11 +625,15 @@ class PeakAlignedConnectivityAnalysis:
                 continue
             if lag_ref is None:
                 lag_ref = local_lag_ref
-            if local_lag_ref.shape != lag_ref.shape or not np.allclose(local_lag_ref, lag_ref):
+            if local_lag_ref.shape != lag_ref.shape or not np.allclose(
+                local_lag_ref, lag_ref
+            ):
                 continue
             c = np.vstack(corrs)
             corr_by_pair.append(c)
-            corr_pair_event_times.append(np.asarray(kept_event_times, dtype=float))
+            corr_pair_event_times.append(
+                np.asarray(kept_event_times, dtype=float)
+            )
             mean = np.nanmean(c, axis=0)
             imax = int(np.nanargmax(np.abs(mean)))
             metrics[f"{a}_to_{b}_n_valid_correlations"] = float(c.shape[0])
@@ -539,10 +647,14 @@ class PeakAlignedConnectivityAnalysis:
             max_events = max(c.shape[0] for c in corr_by_pair)
             n_lag = lag_ref.size
             padded = np.full((n_pairs, max_events, n_lag), np.nan, dtype=float)
-            padded_event_times = np.full((n_pairs, max_events), np.nan, dtype=float)
+            padded_event_times = np.full(
+                (n_pairs, max_events), np.nan, dtype=float
+            )
             for pi, c in enumerate(corr_by_pair):
                 padded[pi, : c.shape[0], :] = c
-                padded_event_times[pi, : corr_pair_event_times[pi].size] = corr_pair_event_times[pi]
+                padded_event_times[pi, : corr_pair_event_times[pi].size] = (
+                    corr_pair_event_times[pi]
+                )
             arrays.update(
                 {
                     "lag_s": lag_ref,
@@ -567,7 +679,9 @@ class PeakAlignedConnectivityAnalysis:
             )
             metrics.update(
                 {
-                    "n_valid_correlations": float(np.sum(np.isfinite(padded[0, :, 0]))),
+                    "n_valid_correlations": float(
+                        np.sum(np.isfinite(padded[0, :, 0]))
+                    ),
                     "max_abs_corr_mean": metrics.get(
                         f"{valid_pairs[0][0]}_to_{valid_pairs[0][1]}_max_abs_corr_mean",
                         np.nan,
@@ -607,7 +721,11 @@ class PeakAlignedConnectivityAnalysis:
                         continue
                     if granger_lag_ref is None:
                         granger_lag_ref = out["lag_s"]
-                    if out["lag_s"].shape != granger_lag_ref.shape or not np.allclose(out["lag_s"], granger_lag_ref):
+                    if out[
+                        "lag_s"
+                    ].shape != granger_lag_ref.shape or not np.allclose(
+                        out["lag_s"], granger_lag_ref
+                    ):
                         continue
                     pxy_by_pair.append(out["p_x_to_y"][None, :])
                     pyx_by_pair.append(out["p_y_to_x"][None, :])
@@ -617,8 +735,13 @@ class PeakAlignedConnectivityAnalysis:
                 # GUI remains responsive. Use a script with larger limits for
                 # heavy offline analyses.
                 event_indices = np.arange(aligned.n_events)
-                if self.granger_max_events is not None and aligned.n_events > int(self.granger_max_events):
-                    event_indices = event_indices[: int(self.granger_max_events)]
+                if (
+                    self.granger_max_events is not None
+                    and aligned.n_events > int(self.granger_max_events)
+                ):
+                    event_indices = event_indices[
+                        : int(self.granger_max_events)
+                    ]
 
                 for a, b in valid_pairs:
                     ix, iy = name_to_i[a], name_to_i[b]
@@ -649,20 +772,29 @@ class PeakAlignedConnectivityAnalysis:
                         continue
                     if granger_lag_ref is None:
                         granger_lag_ref = local_lag_ref
-                    if local_lag_ref.shape != granger_lag_ref.shape or not np.allclose(local_lag_ref, granger_lag_ref):
+                    if (
+                        local_lag_ref.shape != granger_lag_ref.shape
+                        or not np.allclose(local_lag_ref, granger_lag_ref)
+                    ):
                         continue
                     pxy_by_pair.append(np.vstack(pxy))
                     pyx_by_pair.append(np.vstack(pyx))
 
             else:
-                raise ValueError("granger_mode must be 'mean_epoch' or 'per_event'.")
+                raise ValueError(
+                    "granger_mode must be 'mean_epoch' or 'per_event'."
+                )
 
             if granger_lag_ref is not None and pxy_by_pair:
                 max_events = max(a.shape[0] for a in pxy_by_pair)
                 n_pairs = len(pxy_by_pair)
                 n_lag = granger_lag_ref.size
-                pxy_pad = np.full((n_pairs, max_events, n_lag), np.nan, dtype=float)
-                pyx_pad = np.full((n_pairs, max_events, n_lag), np.nan, dtype=float)
+                pxy_pad = np.full(
+                    (n_pairs, max_events, n_lag), np.nan, dtype=float
+                )
+                pyx_pad = np.full(
+                    (n_pairs, max_events, n_lag), np.nan, dtype=float
+                )
                 for pi, arr in enumerate(pxy_by_pair):
                     pxy_pad[pi, : arr.shape[0], :] = arr
                     pyx_pad[pi, : pyx_by_pair[pi].shape[0], :] = pyx_by_pair[pi]
@@ -684,9 +816,17 @@ class PeakAlignedConnectivityAnalysis:
                         "granger_mode": self.granger_mode,
                         "granger_n_pairs": float(n_pairs),
                         "granger_n_lags_tested": float(n_lag),
-                        "granger_effective_max_lag_s": float(granger_lag_ref[-1]) if granger_lag_ref.size else np.nan,
-                        "min_mean_p_x_to_y": float(np.nanmin(arrays["p_x_to_y_mean"])),
-                        "min_mean_p_y_to_x": float(np.nanmin(arrays["p_y_to_x_mean"])),
+                        "granger_effective_max_lag_s": float(
+                            granger_lag_ref[-1]
+                        )
+                        if granger_lag_ref.size
+                        else np.nan,
+                        "min_mean_p_x_to_y": float(
+                            np.nanmin(arrays["p_x_to_y_mean"])
+                        ),
+                        "min_mean_p_y_to_x": float(
+                            np.nanmin(arrays["p_y_to_x_mean"])
+                        ),
                     }
                 )
 
@@ -707,8 +847,12 @@ class PeakAlignedConnectivityAnalysis:
     ) -> dict[str, Any]:
         return {
             "event_signal": self.event_signal,
-            "channels": list(channels) if channels is not None else self.channels,
-            "connectivity_pairs": [list(p) for p in pairs] if pairs is not None else self.connectivity_pairs,
+            "channels": list(channels)
+            if channels is not None
+            else self.channels,
+            "connectivity_pairs": [list(p) for p in pairs]
+            if pairs is not None
+            else self.connectivity_pairs,
             "x_signal": self.x_signal,
             "y_signal": self.y_signal,
             "detector": self.detector,

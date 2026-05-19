@@ -111,7 +111,9 @@ class ParameterEditor:
             return
 
         if spec.description:
-            objects.append(self.pn.pane.Markdown(spec.description, margin=(0, 0, 8, 0)))
+            objects.append(
+                self.pn.pane.Markdown(spec.description, margin=(0, 0, 8, 0))
+            )
 
         for name, pspec in spec.parameters.items():
             provided = name in provided_values
@@ -155,13 +157,23 @@ class ParameterEditor:
         for target_name, target_spec in self.param_specs.items():
             source_name = target_spec.depends_on
             defaults = target_spec.defaults_by_value
-            if not source_name or not defaults or source_name not in self.widgets:
+            if (
+                not source_name
+                or not defaults
+                or source_name not in self.widgets
+            ):
                 continue
 
             source_widget = self.widgets[source_name]
             target_widget = self.widgets[target_name]
 
-            def _callback(event: Any, *, tw=target_widget, ts=target_spec, mapping=defaults) -> None:
+            def _callback(
+                event: Any,
+                *,
+                tw=target_widget,
+                ts=target_spec,
+                mapping=defaults,
+            ) -> None:
                 if event.new in mapping:
                     self._set_widget_value(tw, ts, mapping[event.new])
 
@@ -174,7 +186,9 @@ class ParameterEditor:
             if target_name not in provided_values:
                 source_value = getattr(source_widget, "value", None)
                 if source_value in defaults:
-                    self._set_widget_value(target_widget, target_spec, defaults[source_value])
+                    self._set_widget_value(
+                        target_widget, target_spec, defaults[source_value]
+                    )
 
     def _widget_value_for_param(self, spec: ParameterSpec, value: Any) -> Any:
         kind = spec.kind
@@ -187,7 +201,9 @@ class ParameterEditor:
                         return _non_iso_channels(self.channel_names)
                     return [value] if value in self.channel_names else []
                 if isinstance(value, list | tuple):
-                    return [str(v) for v in value if str(v) in self.channel_names]
+                    return [
+                        str(v) for v in value if str(v) in self.channel_names
+                    ]
                 return []
             if isinstance(value, list | tuple):
                 return ", ".join(str(v) for v in value)
@@ -247,9 +263,17 @@ class ParameterEditor:
             iso = _best_iso_channel(names)
             if iso is not None:
                 return iso
-            return None if spec.allow_none else (non_iso[0] if non_iso else names[0])
+            return (
+                None
+                if spec.allow_none
+                else (non_iso[0] if non_iso else names[0])
+            )
 
-        if spec.allow_none and value is None and _looks_like_optional_pair_signal(name):
+        if (
+            spec.allow_none
+            and value is None
+            and _looks_like_optional_pair_signal(name)
+        ):
             return None
 
         # Prefer biologically common non-isosbestic channels when the registered
@@ -262,7 +286,9 @@ class ParameterEditor:
                     return n
         return non_iso[0] if non_iso else (names[0] if names else value)
 
-    def _set_widget_value(self, widget: Any, spec: ParameterSpec, value: Any) -> None:
+    def _set_widget_value(
+        self, widget: Any, spec: ParameterSpec, value: Any
+    ) -> None:
         widget.value = self._widget_value_for_param(spec, value)
 
     def update_channels(self, channel_names: Iterable[str]) -> None:
@@ -339,14 +365,22 @@ class ParameterEditor:
             return pnw.TextInput(name=label, value=text)
 
         if kind in {"dict", "window"}:
-            return pnw.TextAreaInput(name=label, value=_json_text(value), height=120)
+            return pnw.TextAreaInput(
+                name=label, value=_json_text(value), height=120
+            )
 
         if kind in {"json", "callable"} or (spec.allow_none and value is None):
             if kind == "callable":
-                return pnw.TextInput(name=label, value="" if value is None else str(value))
-            return pnw.TextAreaInput(name=label, value=_json_text(value), height=90)
+                return pnw.TextInput(
+                    name=label, value="" if value is None else str(value)
+                )
+            return pnw.TextAreaInput(
+                name=label, value=_json_text(value), height=90
+            )
 
-        return pnw.TextInput(name=label, value="" if value is None else str(value))
+        return pnw.TextInput(
+            name=label, value="" if value is None else str(value)
+        )
 
     def _value_from_widget(self, widget: Any, spec: ParameterSpec) -> Any:
         value = widget.value
@@ -365,12 +399,20 @@ class ParameterEditor:
             return parts if len(parts) > 1 else (parts[0] if parts else None)
 
         if kind == "int":
-            if spec.allow_none and str(value).strip().lower() in {"", "none", "null"}:
+            if spec.allow_none and str(value).strip().lower() in {
+                "",
+                "none",
+                "null",
+            }:
                 return None
             return int(value)
 
         if kind == "float":
-            if spec.allow_none and str(value).strip().lower() in {"", "none", "null"}:
+            if spec.allow_none and str(value).strip().lower() in {
+                "",
+                "none",
+                "null",
+            }:
                 return None
             return float(value)
 

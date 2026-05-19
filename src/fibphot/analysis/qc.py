@@ -31,24 +31,50 @@ class QCAnalysis:
             "n_signals": float(state.n_signals),
             "duration_s": float(t[-1] - t[0]) if t.size >= 2 else float("nan"),
             "sampling_rate_hz": float(state.sampling_rate),
-            "time_nan_fraction": float(np.mean(~np.isfinite(t))) if t.size else float("nan"),
-            "signal_nan_fraction": float(np.mean(~finite_y)) if y.size else float("nan"),
-            "signal_mean": float(np.nanmean(y)) if np.any(finite_y) else float("nan"),
-            "signal_std": float(np.nanstd(y)) if np.any(finite_y) else float("nan"),
+            "time_nan_fraction": float(np.mean(~np.isfinite(t)))
+            if t.size
+            else float("nan"),
+            "signal_nan_fraction": float(np.mean(~finite_y))
+            if y.size
+            else float("nan"),
+            "signal_mean": float(np.nanmean(y))
+            if np.any(finite_y)
+            else float("nan"),
+            "signal_std": float(np.nanstd(y))
+            if np.any(finite_y)
+            else float("nan"),
             "signal_mad_sigma": _mad_sigma(y),
         }
         if dt_good.size:
             med = float(np.median(dt_good))
             metrics["dt_median_s"] = med
-            metrics["dt_max_rel_deviation"] = float(np.nanmax(np.abs(dt_good - med) / med)) if med > 0 else float("nan")
+            metrics["dt_max_rel_deviation"] = (
+                float(np.nanmax(np.abs(dt_good - med) / med))
+                if med > 0
+                else float("nan")
+            )
         if self.saturation_low is not None:
-            metrics["saturation_low_fraction"] = float(np.mean(y <= self.saturation_low))
+            metrics["saturation_low_fraction"] = float(
+                np.mean(y <= self.saturation_low)
+            )
         if self.saturation_high is not None:
-            metrics["saturation_high_fraction"] = float(np.mean(y >= self.saturation_high))
-        return AnalysisResult(name="qc", channel=channel, window=None, metrics=metrics, params=self._params())
+            metrics["saturation_high_fraction"] = float(
+                np.mean(y >= self.saturation_high)
+            )
+        return AnalysisResult(
+            name="qc",
+            channel=channel,
+            window=None,
+            metrics=metrics,
+            params=self._params(),
+        )
 
     def _params(self) -> dict[str, Any]:
-        return {"signal": self.signal, "saturation_low": self.saturation_low, "saturation_high": self.saturation_high}
+        return {
+            "signal": self.signal,
+            "saturation_low": self.saturation_low,
+            "saturation_high": self.saturation_high,
+        }
 
 
 def _mad_sigma(x) -> float:

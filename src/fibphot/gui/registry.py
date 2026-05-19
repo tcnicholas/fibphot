@@ -101,7 +101,10 @@ class RegisteredObject:
         return self.label or self.key
 
     def defaults(self) -> dict[str, Any]:
-        return {name: _json_default(spec.default) for name, spec in self.parameters.items()}
+        return {
+            name: _json_default(spec.default)
+            for name, spec in self.parameters.items()
+        }
 
     def create(self, params: Mapping[str, Any] | None = None) -> Any:
         p = self.defaults()
@@ -158,7 +161,9 @@ class Registry:
         self._items[key] = obj
         return obj
 
-    def decorator(self, key: str, **kwargs: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def decorator(
+        self, key: str, **kwargs: Any
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def _decorate(factory: Callable[..., Any]) -> Callable[..., Any]:
             self.register(key, factory, **kwargs)
             return factory
@@ -175,7 +180,13 @@ class Registry:
         return iter(self.keys())
 
     def keys(self) -> list[str]:
-        return sorted(self._items, key=lambda k: (self._items[k].group or "", self._items[k].display_name))
+        return sorted(
+            self._items,
+            key=lambda k: (
+                self._items[k].group or "",
+                self._items[k].display_name,
+            ),
+        )
 
     def values(self) -> list[RegisteredObject]:
         return [self._items[k] for k in self.keys()]
@@ -195,7 +206,9 @@ class Registry:
 
     def create(self, key: str, params: Mapping[str, Any] | None = None) -> Any:
         if key not in self._items:
-            raise KeyError(f"Unknown {self.kind} {key!r}. Available: {self.keys()}")
+            raise KeyError(
+                f"Unknown {self.kind} {key!r}. Available: {self.keys()}"
+            )
         return self._items[key].create(params)
 
     def default_params(self, key: str) -> dict[str, Any]:
@@ -213,7 +226,9 @@ class Registry:
         exclude: set[str] | None = None,
         replace: bool = False,
     ) -> RegisteredObject:
-        params = infer_parameter_specs(factory, overrides=overrides, exclude=exclude)
+        params = infer_parameter_specs(
+            factory, overrides=overrides, exclude=exclude
+        )
         return self.register(
             key,
             factory,
@@ -265,7 +280,9 @@ def infer_parameter_specs(
             kind = "float"
         elif isinstance(default, str):
             kind = "str"
-        params[name] = ParameterSpec(default=_json_default(default), kind=kind, allow_none=allow_none)
+        params[name] = ParameterSpec(
+            default=_json_default(default), kind=kind, allow_none=allow_none
+        )
     for name, spec in overrides.items():
         params.setdefault(name, spec)
     return params
@@ -295,7 +312,9 @@ def _window_from_payload(payload: Any) -> AnalysisWindow | None:
         )
     if isinstance(payload, (list, tuple)) and len(payload) >= 2:
         return AnalysisWindow(payload[0], payload[1], "seconds")
-    raise TypeError("window must be None, an AnalysisWindow, a mapping, or a two-item sequence.")
+    raise TypeError(
+        "window must be None, an AnalysisWindow, a mapping, or a two-item sequence."
+    )
 
 
 def _normalise_window_params(params: dict[str, Any]) -> dict[str, Any]:
@@ -373,7 +392,12 @@ def _stage_common_channels(default: Any = "all") -> ParameterSpec:
 
 
 def _signal(default: str | None = None) -> ParameterSpec:
-    return ParameterSpec(default=default, kind="channel", label="Signal", allow_none=default is None)
+    return ParameterSpec(
+        default=default,
+        kind="channel",
+        label="Signal",
+        allow_none=default is None,
+    )
 
 
 def _window(default: dict[str, Any] | None) -> ParameterSpec:
@@ -381,7 +405,7 @@ def _window(default: dict[str, Any] | None) -> ParameterSpec:
         default=default,
         kind="window",
         label="Window",
-        help="JSON object, e.g. {\"start\": 0, \"end\": 10, \"ref\": \"seconds\"}; use null for whole trace.",
+        help='JSON object, e.g. {"start": 0, "end": 10, "ref": "seconds"}; use null for whole trace.',
         allow_none=True,
     )
 
@@ -404,9 +428,18 @@ def register_defaults(*, replace: bool = False) -> None:
         group="Time",
         description="Discard time from the start and/or end of the recording.",
         parameters={
-            "start": ParameterSpec(0.0, "float", label="Remove from start", minimum=0, step=1.0),
-            "end": ParameterSpec(0.0, "float", label="Remove from end", minimum=0, step=1.0),
-            "unit": ParameterSpec("seconds", "select", label="Unit", options=["seconds", "samples"]),
+            "start": ParameterSpec(
+                0.0, "float", label="Remove from start", minimum=0, step=1.0
+            ),
+            "end": ParameterSpec(
+                0.0, "float", label="Remove from end", minimum=0, step=1.0
+            ),
+            "unit": ParameterSpec(
+                "seconds",
+                "select",
+                label="Unit",
+                options=["seconds", "samples"],
+            ),
         },
         replace=replace,
     )
@@ -418,9 +451,23 @@ def register_defaults(*, replace: bool = False) -> None:
             group="Time",
             description="Keep only samples between start and stop.",
             parameters={
-                "start": ParameterSpec(0.0, "float", label="Start", minimum=0, step=1.0),
-                "stop": ParameterSpec(None, "float", label="Stop", minimum=0, step=1.0, allow_none=True),
-                "unit": ParameterSpec("seconds", "select", label="Unit", options=["seconds", "samples"]),
+                "start": ParameterSpec(
+                    0.0, "float", label="Start", minimum=0, step=1.0
+                ),
+                "stop": ParameterSpec(
+                    None,
+                    "float",
+                    label="Stop",
+                    minimum=0,
+                    step=1.0,
+                    allow_none=True,
+                ),
+                "unit": ParameterSpec(
+                    "seconds",
+                    "select",
+                    label="Unit",
+                    options=["seconds", "samples"],
+                ),
             },
             replace=replace,
         )
@@ -431,11 +478,22 @@ def register_defaults(*, replace: bool = False) -> None:
         group="Filtering",
         description="Robust spike/outlier removal.",
         parameters={
-            "window_size": ParameterSpec(13, "int", label="Window size", minimum=3, step=2),
-            "n_sigmas": ParameterSpec(3.0, "float", label="Sigma threshold", minimum=0, step=0.1),
+            "window_size": ParameterSpec(
+                13, "int", label="Window size", minimum=3, step=2
+            ),
+            "n_sigmas": ParameterSpec(
+                3.0, "float", label="Sigma threshold", minimum=0, step=0.1
+            ),
             "channels": _stage_common_channels(),
-            "mad_scale": ParameterSpec(1.4826, "float", label="MAD scale", minimum=0, step=0.001),
-            "mode": ParameterSpec("reflect", "select", label="Padding mode", options=["reflect", "nearest", "mirror", "wrap", "constant"]),
+            "mad_scale": ParameterSpec(
+                1.4826, "float", label="MAD scale", minimum=0, step=0.001
+            ),
+            "mode": ParameterSpec(
+                "reflect",
+                "select",
+                label="Padding mode",
+                options=["reflect", "nearest", "mirror", "wrap", "constant"],
+            ),
             "match_edges": ParameterSpec(True, "bool", label="Match edges"),
         },
         replace=replace,
@@ -447,11 +505,28 @@ def register_defaults(*, replace: bool = False) -> None:
         group="Filtering",
         description="Butterworth low-pass filter.",
         parameters={
-            "critical_frequency": ParameterSpec(10.0, "float", label="Cut-off frequency / Hz", minimum=0.001, step=0.1),
-            "order": ParameterSpec(2, "int", label="Order", minimum=1, maximum=12, step=1),
-            "sampling_rate": ParameterSpec(None, "float", label="Sampling rate override", minimum=0, step=1.0, allow_none=True),
+            "critical_frequency": ParameterSpec(
+                10.0,
+                "float",
+                label="Cut-off frequency / Hz",
+                minimum=0.001,
+                step=0.1,
+            ),
+            "order": ParameterSpec(
+                2, "int", label="Order", minimum=1, maximum=12, step=1
+            ),
+            "sampling_rate": ParameterSpec(
+                None,
+                "float",
+                label="Sampling rate override",
+                minimum=0,
+                step=1.0,
+                allow_none=True,
+            ),
             "channels": _stage_common_channels(),
-            "representation": ParameterSpec("sos", "select", label="Representation", options=["sos", "ba"]),
+            "representation": ParameterSpec(
+                "sos", "select", label="Representation", options=["sos", "ba"]
+            ),
         },
         replace=replace,
     )
@@ -461,7 +536,9 @@ def register_defaults(*, replace: bool = False) -> None:
         label="Median filter",
         group="Filtering",
         parameters={
-            "kernel_size": ParameterSpec(5, "int", label="Kernel size", minimum=1, step=2),
+            "kernel_size": ParameterSpec(
+                5, "int", label="Kernel size", minimum=1, step=2
+            ),
             "channels": _stage_common_channels(),
         },
         replace=replace,
@@ -472,9 +549,31 @@ def register_defaults(*, replace: bool = False) -> None:
         label="Window smoothing",
         group="Smoothing",
         parameters={
-            "window_len": ParameterSpec(11, "int", label="Window length", minimum=3, step=2),
-            "window": ParameterSpec("flat", "select", label="Window", options=["flat", "hanning", "hamming", "bartlett", "blackman"]),
-            "pad_mode": ParameterSpec("reflect", "select", label="Padding mode", options=["reflect", "edge", "linear_ramp", "maximum", "mean", "median", "minimum", "symmetric", "wrap"]),
+            "window_len": ParameterSpec(
+                11, "int", label="Window length", minimum=3, step=2
+            ),
+            "window": ParameterSpec(
+                "flat",
+                "select",
+                label="Window",
+                options=["flat", "hanning", "hamming", "bartlett", "blackman"],
+            ),
+            "pad_mode": ParameterSpec(
+                "reflect",
+                "select",
+                label="Padding mode",
+                options=[
+                    "reflect",
+                    "edge",
+                    "linear_ramp",
+                    "maximum",
+                    "mean",
+                    "median",
+                    "minimum",
+                    "symmetric",
+                    "wrap",
+                ],
+            ),
             "match_edges": ParameterSpec(True, "bool", label="Match edges"),
             "channels": _stage_common_channels(),
         },
@@ -487,9 +586,18 @@ def register_defaults(*, replace: bool = False) -> None:
             label="Savitzky–Golay smoothing",
             group="Smoothing",
             parameters={
-                "window_len": ParameterSpec(11, "int", label="Window length", minimum=3, step=2),
-                "polyorder": ParameterSpec(3, "int", label="Polynomial order", minimum=0, step=1),
-                "mode": ParameterSpec("interp", "select", label="Mode", options=["interp", "mirror", "nearest", "constant", "wrap"]),
+                "window_len": ParameterSpec(
+                    11, "int", label="Window length", minimum=3, step=2
+                ),
+                "polyorder": ParameterSpec(
+                    3, "int", label="Polynomial order", minimum=0, step=1
+                ),
+                "mode": ParameterSpec(
+                    "interp",
+                    "select",
+                    label="Mode",
+                    options=["interp", "mirror", "nearest", "constant", "wrap"],
+                ),
                 "channels": _stage_common_channels(),
             },
             replace=replace,
@@ -501,10 +609,29 @@ def register_defaults(*, replace: bool = False) -> None:
             label="Kalman smoothing",
             group="Smoothing",
             parameters={
-                "model": ParameterSpec("local_level", "select", label="Model", options=["local_level"]),
-                "r": ParameterSpec("auto", "json", label="Observation variance", help="Use \"auto\" or a number."),
-                "q": ParameterSpec(None, "float", label="Process variance", allow_none=True, minimum=0, step=0.001),
-                "q_scale": ParameterSpec(1e-3, "float", label="Auto q scale", minimum=0, step=0.0001),
+                "model": ParameterSpec(
+                    "local_level",
+                    "select",
+                    label="Model",
+                    options=["local_level"],
+                ),
+                "r": ParameterSpec(
+                    "auto",
+                    "json",
+                    label="Observation variance",
+                    help='Use "auto" or a number.',
+                ),
+                "q": ParameterSpec(
+                    None,
+                    "float",
+                    label="Process variance",
+                    allow_none=True,
+                    minimum=0,
+                    step=0.001,
+                ),
+                "q_scale": ParameterSpec(
+                    1e-3, "float", label="Auto q scale", minimum=0, step=0.0001
+                ),
                 "channels": _stage_common_channels(),
             },
             replace=replace,
@@ -517,10 +644,27 @@ def register_defaults(*, replace: bool = False) -> None:
         parameters={
             "subtract": ParameterSpec(True, "bool", label="Subtract baseline"),
             "channels": _stage_common_channels(),
-            "decimate_to_hz": ParameterSpec(None, "float", label="Fit decimation / Hz", allow_none=True, minimum=0, step=1.0),
-            "maxfev": ParameterSpec(2000, "int", label="Max function evaluations", minimum=100, step=100),
-            "tau_fast_bounds": ParameterSpec([60.0, 600.0], "json", label="Fast tau bounds"),
-            "tau_slow_bounds": ParameterSpec([600.0, 36000.0], "json", label="Slow tau bounds"),
+            "decimate_to_hz": ParameterSpec(
+                None,
+                "float",
+                label="Fit decimation / Hz",
+                allow_none=True,
+                minimum=0,
+                step=1.0,
+            ),
+            "maxfev": ParameterSpec(
+                2000,
+                "int",
+                label="Max function evaluations",
+                minimum=100,
+                step=100,
+            ),
+            "tau_fast_bounds": ParameterSpec(
+                [60.0, 600.0], "json", label="Fast tau bounds"
+            ),
+            "tau_slow_bounds": ParameterSpec(
+                [600.0, 36000.0], "json", label="Slow tau bounds"
+            ),
         },
         replace=replace,
     )
@@ -533,10 +677,16 @@ def register_defaults(*, replace: bool = False) -> None:
             "method": ParameterSpec("asls", "str", label="Method"),
             "method_kwargs": ParameterSpec({}, "dict", label="Method kwargs"),
             "channels": _stage_common_channels(),
-            "x_axis": ParameterSpec("time", "select", label="x-axis", options=["time", "index"]),
-            "baseline_key": ParameterSpec(None, "str", label="Baseline key", allow_none=True),
+            "x_axis": ParameterSpec(
+                "time", "select", label="x-axis", options=["time", "index"]
+            ),
+            "baseline_key": ParameterSpec(
+                None, "str", label="Baseline key", allow_none=True
+            ),
             "subtract": ParameterSpec(True, "bool", label="Subtract baseline"),
-            "store_full_params": ParameterSpec(False, "bool", label="Store full params"),
+            "store_full_params": ParameterSpec(
+                False, "bool", label="Store full params"
+            ),
         },
         replace=replace,
     )
@@ -546,14 +696,41 @@ def register_defaults(*, replace: bool = False) -> None:
         label="Isosbestic regression",
         group="Control correction",
         parameters={
-            "control": ParameterSpec(None, "channel", label="Control channel", allow_none=True, help="The GUI will try to select the channel whose name is closest to 'iso'."),
+            "control": ParameterSpec(
+                None,
+                "channel",
+                label="Control channel",
+                allow_none=True,
+                help="The GUI will try to select the channel whose name is closest to 'iso'.",
+            ),
             "channels": _stage_common_channels(None),
-            "method": ParameterSpec("irls_tukey", "select", label="Method", options=["ols", "huber", "theil_sen", "irls_huber", "irls_tukey"]),
-            "include_intercept": ParameterSpec(True, "bool", label="Include intercept"),
-            "tuning_constant": ParameterSpec(1.4, "float", label="Tuning constant", minimum=0, step=0.1),
-            "max_iter": ParameterSpec(100, "int", label="Max iterations", minimum=1, step=10),
-            "tol": ParameterSpec(1e-10, "float", label="Tolerance", minimum=0, step=1e-10),
-            "store_weights": ParameterSpec(False, "bool", label="Store weights"),
+            "method": ParameterSpec(
+                "irls_tukey",
+                "select",
+                label="Method",
+                options=[
+                    "ols",
+                    "huber",
+                    "theil_sen",
+                    "irls_huber",
+                    "irls_tukey",
+                ],
+            ),
+            "include_intercept": ParameterSpec(
+                True, "bool", label="Include intercept"
+            ),
+            "tuning_constant": ParameterSpec(
+                1.4, "float", label="Tuning constant", minimum=0, step=0.1
+            ),
+            "max_iter": ParameterSpec(
+                100, "int", label="Max iterations", minimum=1, step=10
+            ),
+            "tol": ParameterSpec(
+                1e-10, "float", label="Tolerance", minimum=0, step=1e-10
+            ),
+            "store_weights": ParameterSpec(
+                False, "bool", label="Store weights"
+            ),
         },
         replace=replace,
     )
@@ -563,13 +740,41 @@ def register_defaults(*, replace: bool = False) -> None:
         label="Isosbestic dF/F",
         group="Control correction",
         parameters={
-            "control": ParameterSpec(None, "channel", label="Control channel", allow_none=True, help="The GUI will try to select the channel whose name is closest to 'iso'."),
+            "control": ParameterSpec(
+                None,
+                "channel",
+                label="Control channel",
+                allow_none=True,
+                help="The GUI will try to select the channel whose name is closest to 'iso'.",
+            ),
             "channels": _stage_common_channels(None),
-            "method": ParameterSpec("irls_tukey", "select", label="Method", options=["ols", "huber", "theil_sen", "irls_huber", "irls_tukey"]),
-            "include_intercept": ParameterSpec(True, "bool", label="Include intercept"),
-            "mode": ParameterSpec("percent", "select", label="Output mode", options=["df", "dff", "percent"]),
-            "tuning_constant": ParameterSpec(4.685, "float", label="Tuning constant", minimum=0, step=0.1),
-            "store_weights": ParameterSpec(False, "bool", label="Store weights"),
+            "method": ParameterSpec(
+                "irls_tukey",
+                "select",
+                label="Method",
+                options=[
+                    "ols",
+                    "huber",
+                    "theil_sen",
+                    "irls_huber",
+                    "irls_tukey",
+                ],
+            ),
+            "include_intercept": ParameterSpec(
+                True, "bool", label="Include intercept"
+            ),
+            "mode": ParameterSpec(
+                "percent",
+                "select",
+                label="Output mode",
+                options=["df", "dff", "percent"],
+            ),
+            "tuning_constant": ParameterSpec(
+                4.685, "float", label="Tuning constant", minimum=0, step=0.1
+            ),
+            "store_weights": ParameterSpec(
+                False, "bool", label="Store weights"
+            ),
             "store_fit": ParameterSpec(True, "bool", label="Store fit"),
             "store_df": ParameterSpec(False, "bool", label="Store ΔF"),
         },
@@ -581,10 +786,19 @@ def register_defaults(*, replace: bool = False) -> None:
         label="Baseline normalisation",
         group="Normalisation",
         parameters={
-            "baseline_key": ParameterSpec("double_exp_baseline", "str", label="Baseline key"),
-            "mode": ParameterSpec("percent", "select", label="Mode", options=["df", "dff", "percent"]),
+            "baseline_key": ParameterSpec(
+                "double_exp_baseline", "str", label="Baseline key"
+            ),
+            "mode": ParameterSpec(
+                "percent",
+                "select",
+                label="Mode",
+                options=["df", "dff", "percent"],
+            ),
             "channels": _stage_common_channels(),
-            "eps": ParameterSpec(1e-12, "float", label="Epsilon", minimum=0, step=1e-12),
+            "eps": ParameterSpec(
+                1e-12, "float", label="Epsilon", minimum=0, step=1e-12
+            ),
         },
         replace=replace,
     )
@@ -595,9 +809,17 @@ def register_defaults(*, replace: bool = False) -> None:
         group="Normalisation",
         parameters={
             "channels": _stage_common_channels(),
-            "time_window": ParameterSpec(None, "json", label="Reference time window", allow_none=True, help="null or [start, end] in seconds."),
+            "time_window": ParameterSpec(
+                None,
+                "json",
+                label="Reference time window",
+                allow_none=True,
+                help="null or [start, end] in seconds.",
+            ),
             "ddof": ParameterSpec(0, "int", label="ddof", minimum=0, step=1),
-            "eps": ParameterSpec(1e-12, "float", label="Epsilon", minimum=0, step=1e-12),
+            "eps": ParameterSpec(
+                1e-12, "float", label="Epsilon", minimum=0, step=1e-12
+            ),
         },
         replace=replace,
     )
@@ -608,10 +830,18 @@ def register_defaults(*, replace: bool = False) -> None:
         group="Normalisation",
         parameters={
             "channels": _stage_common_channels(),
-            "time_window": ParameterSpec(None, "json", label="Reference time window", allow_none=True),
-            "scale": ParameterSpec("rms", "select", label="Scale", options=["rms", "mad"]),
-            "mad_scale": ParameterSpec(1.4826, "float", label="MAD scale", minimum=0, step=0.001),
-            "eps": ParameterSpec(1e-12, "float", label="Epsilon", minimum=0, step=1e-12),
+            "time_window": ParameterSpec(
+                None, "json", label="Reference time window", allow_none=True
+            ),
+            "scale": ParameterSpec(
+                "rms", "select", label="Scale", options=["rms", "mad"]
+            ),
+            "mad_scale": ParameterSpec(
+                1.4826, "float", label="MAD scale", minimum=0, step=0.001
+            ),
+            "eps": ParameterSpec(
+                1e-12, "float", label="Epsilon", minimum=0, step=1e-12
+            ),
         },
         replace=replace,
     )
@@ -626,8 +856,12 @@ def register_defaults(*, replace: bool = False) -> None:
         description="Basic quality-control metrics.",
         parameters={
             "signal": _signal(None),
-            "saturation_low": ParameterSpec(None, "float", label="Saturation low", allow_none=True),
-            "saturation_high": ParameterSpec(None, "float", label="Saturation high", allow_none=True),
+            "saturation_low": ParameterSpec(
+                None, "float", label="Saturation low", allow_none=True
+            ),
+            "saturation_high": ParameterSpec(
+                None, "float", label="Saturation high", allow_none=True
+            ),
         },
         replace=replace,
     )
@@ -640,11 +874,35 @@ def register_defaults(*, replace: bool = False) -> None:
         normalise=_normalise_window_params,
         parameters={
             "signal": _signal("gcamp"),
-            "window": _window({"start": 0.0, "end": 10.0, "ref": "seconds", "label": None}),
-            "mode": ParameterSpec("positive", "select", label="Mode", options=["signed", "positive", "negative", "absolute"]),
-            "baseline": ParameterSpec("pre_median", "select", label="Baseline", options=["zero", "window_mean", "window_median", "pre_mean", "pre_median", "window_quantile", "pre_quantile"]),
-            "pre_seconds": ParameterSpec(10.0, "float", label="Pre-window / s", minimum=0, step=1.0),
-            "quantile": ParameterSpec(0.1, "float", label="Quantile", minimum=0, maximum=1, step=0.05),
+            "window": _window(
+                {"start": 0.0, "end": 10.0, "ref": "seconds", "label": None}
+            ),
+            "mode": ParameterSpec(
+                "positive",
+                "select",
+                label="Mode",
+                options=["signed", "positive", "negative", "absolute"],
+            ),
+            "baseline": ParameterSpec(
+                "pre_median",
+                "select",
+                label="Baseline",
+                options=[
+                    "zero",
+                    "window_mean",
+                    "window_median",
+                    "pre_mean",
+                    "pre_median",
+                    "window_quantile",
+                    "pre_quantile",
+                ],
+            ),
+            "pre_seconds": ParameterSpec(
+                10.0, "float", label="Pre-window / s", minimum=0, step=1.0
+            ),
+            "quantile": ParameterSpec(
+                0.1, "float", label="Quantile", minimum=0, maximum=1, step=0.05
+            ),
         },
         replace=replace,
     )
@@ -657,17 +915,58 @@ def register_defaults(*, replace: bool = False) -> None:
         normalise=_normalise_window_params,
         parameters={
             "signal": _signal("gcamp"),
-            "kind": ParameterSpec("peak", "select", label="Kind", options=["peak", "valley", "both"]),
+            "kind": ParameterSpec(
+                "peak",
+                "select",
+                label="Kind",
+                options=["peak", "valley", "both"],
+            ),
             "window": _window(None),
-            "smooth_for_detection": ParameterSpec(True, "bool", label="Smooth before detection"),
-            "smooth_window_len": ParameterSpec(25, "int", label="Smooth window", minimum=3, step=2),
-            "height": ParameterSpec(None, "json", label="Height", allow_none=True),
-            "prominence": ParameterSpec(None, "json", label="Prominence", allow_none=True),
-            "distance_s": ParameterSpec(0.25, "float", label="Distance / s", allow_none=True, minimum=0, step=0.05),
-            "width_s": ParameterSpec(0.8, "float", label="Width / s", allow_none=True, minimum=0, step=0.05),
-            "auto_height_sigmas": ParameterSpec(1.0, "float", label="Auto height sigmas", minimum=0, step=0.1),
-            "auto_prominence_sigmas": ParameterSpec(2.0, "float", label="Auto prominence sigmas", minimum=0, step=0.1),
-            "fit_model": ParameterSpec("alpha", "select", label="Fit model", allow_none=True, options=[None, "gaussian", "lorentzian", "alpha"]),
+            "smooth_for_detection": ParameterSpec(
+                True, "bool", label="Smooth before detection"
+            ),
+            "smooth_window_len": ParameterSpec(
+                25, "int", label="Smooth window", minimum=3, step=2
+            ),
+            "height": ParameterSpec(
+                None, "json", label="Height", allow_none=True
+            ),
+            "prominence": ParameterSpec(
+                None, "json", label="Prominence", allow_none=True
+            ),
+            "distance_s": ParameterSpec(
+                0.25,
+                "float",
+                label="Distance / s",
+                allow_none=True,
+                minimum=0,
+                step=0.05,
+            ),
+            "width_s": ParameterSpec(
+                0.8,
+                "float",
+                label="Width / s",
+                allow_none=True,
+                minimum=0,
+                step=0.05,
+            ),
+            "auto_height_sigmas": ParameterSpec(
+                1.0, "float", label="Auto height sigmas", minimum=0, step=0.1
+            ),
+            "auto_prominence_sigmas": ParameterSpec(
+                2.0,
+                "float",
+                label="Auto prominence sigmas",
+                minimum=0,
+                step=0.1,
+            ),
+            "fit_model": ParameterSpec(
+                "alpha",
+                "select",
+                label="Fit model",
+                allow_none=True,
+                options=[None, "gaussian", "lorentzian", "alpha"],
+            ),
         },
         replace=replace,
     )
@@ -680,21 +979,79 @@ def register_defaults(*, replace: bool = False) -> None:
         normalise=_normalise_template_params,
         parameters={
             "signal": _signal("rgeco"),
-            "template_func": ParameterSpec("fibphot.analysis.peaks:biexponential_peak", "callable", label="Template function"),
-            "template_params": ParameterSpec({"tau_rise": 0.1, "tau_decay": 0.5}, "dict", label="Template parameters"),
-            "window": _window({"start": 0.0, "end": 1750.0, "ref": "seconds", "label": None}),
-            "kind": ParameterSpec("peak", "select", label="Kind", options=["peak", "valley"]),
-            "template_duration": ParameterSpec(0.6, "float", label="Template duration / s", minimum=0.001, step=0.05),
-            "match_factor": ParameterSpec(1.5, "float", label="Match factor", minimum=0, step=0.1),
-            "threshold": ParameterSpec(None, "float", label="Absolute threshold", allow_none=True),
-            "refractory_s": ParameterSpec(0.1, "float", label="Refractory / s", minimum=0, step=0.05),
-            "align_to": ParameterSpec("peak_top", "select", label="Align to", options=["peak_top", "match"]),
-            "search_window_s": ParameterSpec(1.0, "float", label="Peak-top search span / s", minimum=0, step=0.05),
-            "enforce_aligned_refractory": ParameterSpec(True, "bool", label="Suppress aligned duplicates"),
-            "min_peak_amp": ParameterSpec(0.005, "float", label="Minimum peak amplitude", allow_none=True, step=0.001),
-            "measure_widths": ParameterSpec(True, "bool", label="Measure widths"),
-            "rel_height": ParameterSpec(0.5, "float", label="Relative width height", minimum=0, maximum=1, step=0.05),
-            "fit_model": ParameterSpec(None, "select", label="Fit model", allow_none=True, options=[None, "gaussian", "lorentzian", "alpha"]),
+            "template_func": ParameterSpec(
+                "fibphot.analysis.peaks:biexponential_peak",
+                "callable",
+                label="Template function",
+            ),
+            "template_params": ParameterSpec(
+                {"tau_rise": 0.1, "tau_decay": 0.5},
+                "dict",
+                label="Template parameters",
+            ),
+            "window": _window(
+                {"start": 0.0, "end": 1750.0, "ref": "seconds", "label": None}
+            ),
+            "kind": ParameterSpec(
+                "peak", "select", label="Kind", options=["peak", "valley"]
+            ),
+            "template_duration": ParameterSpec(
+                0.6,
+                "float",
+                label="Template duration / s",
+                minimum=0.001,
+                step=0.05,
+            ),
+            "match_factor": ParameterSpec(
+                1.5, "float", label="Match factor", minimum=0, step=0.1
+            ),
+            "threshold": ParameterSpec(
+                None, "float", label="Absolute threshold", allow_none=True
+            ),
+            "refractory_s": ParameterSpec(
+                0.1, "float", label="Refractory / s", minimum=0, step=0.05
+            ),
+            "align_to": ParameterSpec(
+                "peak_top",
+                "select",
+                label="Align to",
+                options=["peak_top", "match"],
+            ),
+            "search_window_s": ParameterSpec(
+                1.0,
+                "float",
+                label="Peak-top search span / s",
+                minimum=0,
+                step=0.05,
+            ),
+            "enforce_aligned_refractory": ParameterSpec(
+                True, "bool", label="Suppress aligned duplicates"
+            ),
+            "min_peak_amp": ParameterSpec(
+                0.005,
+                "float",
+                label="Minimum peak amplitude",
+                allow_none=True,
+                step=0.001,
+            ),
+            "measure_widths": ParameterSpec(
+                True, "bool", label="Measure widths"
+            ),
+            "rel_height": ParameterSpec(
+                0.5,
+                "float",
+                label="Relative width height",
+                minimum=0,
+                maximum=1,
+                step=0.05,
+            ),
+            "fit_model": ParameterSpec(
+                None,
+                "select",
+                label="Fit model",
+                allow_none=True,
+                options=[None, "gaussian", "lorentzian", "alpha"],
+            ),
         },
         replace=replace,
     )
@@ -709,16 +1066,49 @@ def register_defaults(*, replace: bool = False) -> None:
         parameters={
             "event_signal": _signal("rgeco"),
             "channels": _stage_common_channels("all"),
-            "detector": ParameterSpec("template", "select", label="Peak detector", options=["template", "peaks"]),
+            "detector": ParameterSpec(
+                "template",
+                "select",
+                label="Peak detector",
+                options=["template", "peaks"],
+            ),
             "detector_params": _detector_params("template"),
             "window": _window(None),
-            "t_before_s": ParameterSpec(20.0, "float", label="Before event / s", minimum=0, step=1.0),
-            "t_after_s": ParameterSpec(20.0, "float", label="After event / s", minimum=0, step=1.0),
-            "target_fs": ParameterSpec(None, "float", label="Target sampling / Hz", allow_none=True, minimum=0, step=1.0),
+            "t_before_s": ParameterSpec(
+                20.0, "float", label="Before event / s", minimum=0, step=1.0
+            ),
+            "t_after_s": ParameterSpec(
+                20.0, "float", label="After event / s", minimum=0, step=1.0
+            ),
+            "target_fs": ParameterSpec(
+                None,
+                "float",
+                label="Target sampling / Hz",
+                allow_none=True,
+                minimum=0,
+                step=1.0,
+            ),
             "exclude_times": ParameterSpec([], "json", label="Exclude windows"),
-            "exclude_mode": ParameterSpec("peak_time", "select", label="Exclude mode", options=["peak_time", "window_overlap"]),
-            "min_previous_interval_s": ParameterSpec(None, "float", label="Minimum previous-event gap / s", allow_none=True, minimum=0, step=1.0),
-            "baseline_window_s": ParameterSpec(None, "json", label="Baseline window relative to event", allow_none=True),
+            "exclude_mode": ParameterSpec(
+                "peak_time",
+                "select",
+                label="Exclude mode",
+                options=["peak_time", "window_overlap"],
+            ),
+            "min_previous_interval_s": ParameterSpec(
+                None,
+                "float",
+                label="Minimum previous-event gap / s",
+                allow_none=True,
+                minimum=0,
+                step=1.0,
+            ),
+            "baseline_window_s": ParameterSpec(
+                None,
+                "json",
+                label="Baseline window relative to event",
+                allow_none=True,
+            ),
         },
         replace=replace,
     )
@@ -734,7 +1124,9 @@ def register_defaults(*, replace: bool = False) -> None:
             "x_signal": _signal("gcamp"),
             "y_signal": _signal("rgeco"),
             "window": _window(None),
-            "max_lag_s": ParameterSpec(10.0, "float", label="Maximum lag / s", minimum=0, step=1.0),
+            "max_lag_s": ParameterSpec(
+                10.0, "float", label="Maximum lag / s", minimum=0, step=1.0
+            ),
             "detrend": ParameterSpec(True, "bool", label="Detrend"),
             "normalise": ParameterSpec(True, "bool", label="Normalise"),
         },
@@ -752,10 +1144,36 @@ def register_defaults(*, replace: bool = False) -> None:
             "x_signal": _signal("gcamp"),
             "y_signal": _signal("rgeco"),
             "window": _window(None),
-            "max_lag_s": ParameterSpec(5.0, "float", label="Maximum lag / s", minimum=0, step=1.0),
-            "target_dt": ParameterSpec(1.0, "float", label="Target dt / s", allow_none=True, minimum=0, step=0.1, help="Downsample before Granger. Larger values are faster."),
-            "max_lag_steps": ParameterSpec(20, "int", label="Maximum lag steps", allow_none=True, minimum=1, step=1, help="Caps the number of VAR lags tested."),
-            "max_samples": ParameterSpec(2000, "int", label="Maximum samples", allow_none=True, minimum=100, step=100, help="Caps samples after downsampling for interactive use."),
+            "max_lag_s": ParameterSpec(
+                5.0, "float", label="Maximum lag / s", minimum=0, step=1.0
+            ),
+            "target_dt": ParameterSpec(
+                1.0,
+                "float",
+                label="Target dt / s",
+                allow_none=True,
+                minimum=0,
+                step=0.1,
+                help="Downsample before Granger. Larger values are faster.",
+            ),
+            "max_lag_steps": ParameterSpec(
+                20,
+                "int",
+                label="Maximum lag steps",
+                allow_none=True,
+                minimum=1,
+                step=1,
+                help="Caps the number of VAR lags tested.",
+            ),
+            "max_samples": ParameterSpec(
+                2000,
+                "int",
+                label="Maximum samples",
+                allow_none=True,
+                minimum=100,
+                step=100,
+                help="Caps samples after downsampling for interactive use.",
+            ),
             "detrend": ParameterSpec(True, "bool", label="Detrend"),
             "difference": ParameterSpec(True, "bool", label="Difference"),
             "fdr": ParameterSpec(True, "bool", label="FDR correction"),
@@ -787,26 +1205,113 @@ def register_defaults(*, replace: bool = False) -> None:
                     "Defaults to all non-isosbestic channels; the event signal is always included."
                 ),
             ),
-            "connectivity_pairs": ParameterSpec(None, "json", label="Connectivity pairs", allow_none=True, help='Optional list such as [["gcamp", "rgeco"]]. If null, event_signal is paired with every other aligned channel.'),
-            "x_signal": ParameterSpec(None, "channel", label="Optional x signal", allow_none=True, help="Convenience single pair. Leave null to use event-signal-to-other-channel pairs."),
-            "y_signal": ParameterSpec(None, "channel", label="Optional y signal", allow_none=True, help="Convenience single pair. Leave null to use event-signal-to-other-channel pairs."),
-            "detector": ParameterSpec("template", "select", label="Peak detector", options=["template", "peaks"]),
+            "connectivity_pairs": ParameterSpec(
+                None,
+                "json",
+                label="Connectivity pairs",
+                allow_none=True,
+                help='Optional list such as [["gcamp", "rgeco"]]. If null, event_signal is paired with every other aligned channel.',
+            ),
+            "x_signal": ParameterSpec(
+                None,
+                "channel",
+                label="Optional x signal",
+                allow_none=True,
+                help="Convenience single pair. Leave null to use event-signal-to-other-channel pairs.",
+            ),
+            "y_signal": ParameterSpec(
+                None,
+                "channel",
+                label="Optional y signal",
+                allow_none=True,
+                help="Convenience single pair. Leave null to use event-signal-to-other-channel pairs.",
+            ),
+            "detector": ParameterSpec(
+                "template",
+                "select",
+                label="Peak detector",
+                options=["template", "peaks"],
+            ),
             "detector_params": _detector_params("template"),
             "window": _window(None),
-            "t_before_s": ParameterSpec(20.0, "float", label="Before event / s", minimum=0, step=1.0),
-            "t_after_s": ParameterSpec(20.0, "float", label="After event / s", minimum=0, step=1.0),
-            "target_fs": ParameterSpec(None, "float", label="Target sampling / Hz", allow_none=True, minimum=0, step=1.0),
-            "dt": ParameterSpec(None, "float", label="Output dt / s", allow_none=True, minimum=0, step=0.001),
-            "baseline_window_s": ParameterSpec(None, "json", label="Baseline window / s", allow_none=True, help="Optional [start, stop] relative-time window to subtract from each epoch, e.g. [-10, -2]."),
-            "max_lag_s": ParameterSpec(5.0, "float", label="Maximum lag / s", minimum=0, step=1.0),
-            "detrend": ParameterSpec(True, "bool", label="Detrend before correlation"),
-            "normalise": ParameterSpec(True, "bool", label="Normalise correlation"),
+            "t_before_s": ParameterSpec(
+                20.0, "float", label="Before event / s", minimum=0, step=1.0
+            ),
+            "t_after_s": ParameterSpec(
+                20.0, "float", label="After event / s", minimum=0, step=1.0
+            ),
+            "target_fs": ParameterSpec(
+                None,
+                "float",
+                label="Target sampling / Hz",
+                allow_none=True,
+                minimum=0,
+                step=1.0,
+            ),
+            "dt": ParameterSpec(
+                None,
+                "float",
+                label="Output dt / s",
+                allow_none=True,
+                minimum=0,
+                step=0.001,
+            ),
+            "baseline_window_s": ParameterSpec(
+                None,
+                "json",
+                label="Baseline window / s",
+                allow_none=True,
+                help="Optional [start, stop] relative-time window to subtract from each epoch, e.g. [-10, -2].",
+            ),
+            "max_lag_s": ParameterSpec(
+                5.0, "float", label="Maximum lag / s", minimum=0, step=1.0
+            ),
+            "detrend": ParameterSpec(
+                True, "bool", label="Detrend before correlation"
+            ),
+            "normalise": ParameterSpec(
+                True, "bool", label="Normalise correlation"
+            ),
             "run_granger": ParameterSpec(False, "bool", label="Run Granger"),
-            "granger_mode": ParameterSpec("mean_epoch", "select", label="Granger mode", options=["mean_epoch", "per_event"], help="mean_epoch is much faster; per_event tests each aligned epoch separately."),
-            "granger_target_dt": ParameterSpec(1.0, "float", label="Granger target dt / s", allow_none=True, minimum=0, step=0.1),
-            "granger_max_lag_steps": ParameterSpec(10, "int", label="Granger maximum lag steps", allow_none=True, minimum=1, step=1),
-            "granger_max_samples": ParameterSpec(1000, "int", label="Granger maximum samples", allow_none=True, minimum=100, step=100),
-            "granger_max_events": ParameterSpec(50, "int", label="Granger maximum events", allow_none=True, minimum=1, step=1),
+            "granger_mode": ParameterSpec(
+                "mean_epoch",
+                "select",
+                label="Granger mode",
+                options=["mean_epoch", "per_event"],
+                help="mean_epoch is much faster; per_event tests each aligned epoch separately.",
+            ),
+            "granger_target_dt": ParameterSpec(
+                1.0,
+                "float",
+                label="Granger target dt / s",
+                allow_none=True,
+                minimum=0,
+                step=0.1,
+            ),
+            "granger_max_lag_steps": ParameterSpec(
+                10,
+                "int",
+                label="Granger maximum lag steps",
+                allow_none=True,
+                minimum=1,
+                step=1,
+            ),
+            "granger_max_samples": ParameterSpec(
+                1000,
+                "int",
+                label="Granger maximum samples",
+                allow_none=True,
+                minimum=100,
+                step=100,
+            ),
+            "granger_max_events": ParameterSpec(
+                50,
+                "int",
+                label="Granger maximum events",
+                allow_none=True,
+                minimum=1,
+                step=1,
+            ),
         },
         replace=replace,
     )
@@ -822,7 +1327,11 @@ class StageConfig:
     enabled: bool = True
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "params": self.params, "enabled": self.enabled}
+        return {
+            "name": self.name,
+            "params": self.params,
+            "enabled": self.enabled,
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "StageConfig":
@@ -840,7 +1349,11 @@ class AnalysisConfig:
     enabled: bool = True
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "params": self.params, "enabled": self.enabled}
+        return {
+            "name": self.name,
+            "params": self.params,
+            "enabled": self.enabled,
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "AnalysisConfig":
@@ -852,12 +1365,20 @@ class AnalysisConfig:
 
 
 def create_stage(config: StageConfig | Mapping[str, Any]) -> Any:
-    cfg = config if isinstance(config, StageConfig) else StageConfig.from_dict(config)
+    cfg = (
+        config
+        if isinstance(config, StageConfig)
+        else StageConfig.from_dict(config)
+    )
     return STAGE_REGISTRY.create(cfg.name, cfg.params)
 
 
 def create_analysis(config: AnalysisConfig | Mapping[str, Any]) -> Any:
-    cfg = config if isinstance(config, AnalysisConfig) else AnalysisConfig.from_dict(config)
+    cfg = (
+        config
+        if isinstance(config, AnalysisConfig)
+        else AnalysisConfig.from_dict(config)
+    )
     return ANALYSIS_REGISTRY.create(cfg.name, cfg.params)
 
 

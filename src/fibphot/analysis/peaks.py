@@ -108,7 +108,9 @@ def build_template(
 
     tt = np.arange(0.0, duration, 1.0 / fs, dtype=float)
     if tt.size < 3:
-        raise ValueError("Template duration is too short for the sampling rate.")
+        raise ValueError(
+            "Template duration is too short for the sampling rate."
+        )
 
     params = dict(template_params or {})
     template = np.asarray(func(tt, **params), dtype=float)
@@ -124,7 +126,9 @@ def build_template(
     if normalise:
         norm = float(np.linalg.norm(template))
         if norm <= 0 or not np.isfinite(norm):
-            raise ValueError("Template function produced a flat or non-finite template.")
+            raise ValueError(
+                "Template function produced a flat or non-finite template."
+            )
         template = template / norm
     return tt, template
 
@@ -898,7 +902,6 @@ class PeakAnalysis:
         }
 
 
-
 def _suppress_aligned_template_duplicates(
     records: list[dict[str, Any]], *, distance: int
 ) -> list[dict[str, Any]]:
@@ -912,7 +915,9 @@ def _suppress_aligned_template_duplicates(
     if len(records) <= 1:
         return records
     distance = max(1, int(distance))
-    ordered = sorted(records, key=lambda r: float(r["match_score"]), reverse=True)
+    ordered = sorted(
+        records, key=lambda r: float(r["match_score"]), reverse=True
+    )
     kept: list[dict[str, Any]] = []
     kept_idx: list[int] = []
     for rec in ordered:
@@ -1047,7 +1052,9 @@ class PeaksByTemplate:
         # symmetric window around that estimate.
         template_peak_index = int(np.nanargmax(template))
         same_mode_offset = int(template.size - 1 - ((template.size - 1) // 2))
-        search_half_pts = int(max(1, round(float(self.search_window_s) * fs / 2.0)))
+        search_half_pts = int(
+            max(1, round(float(self.search_window_s) * fs / 2.0))
+        )
 
         records: list[dict[str, Any]] = []
         seen_top_idx: set[int] = set()
@@ -1082,7 +1089,9 @@ class PeaksByTemplate:
                 continue
 
             amp_for_filter = sign * float(y_search[top])
-            if self.min_peak_amp is not None and amp_for_filter < float(self.min_peak_amp):
+            if self.min_peak_amp is not None and amp_for_filter < float(
+                self.min_peak_amp
+            ):
                 continue
 
             seen_top_idx.add(top)
@@ -1099,7 +1108,9 @@ class PeaksByTemplate:
             )
 
         if self.enforce_aligned_refractory and records:
-            records = _suppress_aligned_template_duplicates(records, distance=distance)
+            records = _suppress_aligned_template_duplicates(
+                records, distance=distance
+            )
 
         if not records:
             return AnalysisResult(
@@ -1127,9 +1138,13 @@ class PeaksByTemplate:
             top_idx = np.array([r["peak_index"] for r in records], dtype=int)
             z = sign * y_search
             try:
-                prom, left_bases, right_bases = scipy_signal.peak_prominences(z, top_idx)
-                widths, _width_heights, left_ips, right_ips = scipy_signal.peak_widths(
-                    z, top_idx, rel_height=self.rel_height
+                prom, left_bases, right_bases = scipy_signal.peak_prominences(
+                    z, top_idx
+                )
+                widths, _width_heights, left_ips, right_ips = (
+                    scipy_signal.peak_widths(
+                        z, top_idx, rel_height=self.rel_height
+                    )
                 )
                 left_ip_x = _interp_x_at_positions(t, left_ips.astype(float))
                 right_ip_x = _interp_x_at_positions(t, right_ips.astype(float))
@@ -1185,8 +1200,13 @@ class PeaksByTemplate:
         arrays = _events_to_arrays(events, offset=int(sl.start))
         arrays.update(
             {
-                "match_index": np.array([r["match_index"] + int(sl.start) for r in records], dtype=int),
-                "match_time_s": np.array([t[int(r["match_index"])] for r in records], dtype=float),
+                "match_index": np.array(
+                    [r["match_index"] + int(sl.start) for r in records],
+                    dtype=int,
+                ),
+                "match_time_s": np.array(
+                    [t[int(r["match_index"])] for r in records], dtype=float
+                ),
                 "expected_peak_index": np.array(
                     [r["expected_peak_index"] + int(sl.start) for r in records],
                     dtype=int,
@@ -1195,15 +1215,23 @@ class PeaksByTemplate:
                     [t[int(r["expected_peak_index"])] for r in records],
                     dtype=float,
                 ),
-                "match_score": np.array([r["match_score"] for r in records], dtype=float),
-                "match_threshold": np.full(len(records), float(threshold), dtype=float),
+                "match_score": np.array(
+                    [r["match_score"] for r in records], dtype=float
+                ),
+                "match_threshold": np.full(
+                    len(records), float(threshold), dtype=float
+                ),
                 "alignment_shift_s": np.array(
-                    [t[int(r["peak_index"])] - t[int(r["match_index"])] for r in records],
+                    [
+                        t[int(r["peak_index"])] - t[int(r["match_index"])]
+                        for r in records
+                    ],
                     dtype=float,
                 ),
                 "expected_to_aligned_shift_s": np.array(
                     [
-                        t[int(r["peak_index"])] - t[int(r["expected_peak_index"])]
+                        t[int(r["peak_index"])]
+                        - t[int(r["expected_peak_index"])]
                         for r in records
                     ],
                     dtype=float,
@@ -1264,7 +1292,6 @@ class PeaksByTemplate:
             "fit_window_s": self.fit_window_s,
             "fit_window_samples": self.fit_window_samples,
         }
-
 
 
 def _events_to_arrays(
@@ -1705,7 +1732,9 @@ def plot_peaks_by_template_result(
 
     if ax is None:
         if show_match_score:
-            fig, (ax, score_ax) = plt.subplots(2, 1, figsize=(8, 4.5), dpi=150, sharex=True)
+            fig, (ax, score_ax) = plt.subplots(
+                2, 1, figsize=(8, 4.5), dpi=150, sharex=True
+            )
         else:
             fig, ax = plt.subplots(figsize=(8, 3), dpi=150)
     else:
@@ -1755,7 +1784,9 @@ def plot_peaks_by_template_result(
         if threshold is None or not np.isfinite(threshold):
             threshold = med + float(params.get("match_factor", 1.5)) * sigma
         score_ax.plot(t, corr, linewidth=1.0, alpha=0.9, label="match score")
-        score_ax.axhline(float(threshold), linestyle="--", linewidth=1.0, color=peak_colour)
+        score_ax.axhline(
+            float(threshold), linestyle="--", linewidth=1.0, color=peak_colour
+        )
         score_ax.set_ylabel("match score")
         score_ax.set_xlabel("time (s)")
         if zoom is not None:

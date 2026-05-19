@@ -6,10 +6,14 @@ from typing import Any
 
 import numpy as np
 
-from .registry import ANALYSIS_REGISTRY, STAGE_REGISTRY, AnalysisConfig, StageConfig
+from .registry import (
+    ANALYSIS_REGISTRY,
+    STAGE_REGISTRY,
+    AnalysisConfig,
+    StageConfig,
+)
 from .session import GuiSession
 from .widgets import ParameterEditor
-
 
 APP_CSS = """
 :root {
@@ -17,6 +21,7 @@ APP_CSS = """
   --fibphot-surface: #ffffff;
   --fibphot-surface-soft: #f8fafc;
   --fibphot-border: #dbe3ef;
+  --fibphot-border-strong: #c8d3e2;
   --fibphot-text: #182433;
   --fibphot-muted: #5e6b7a;
   --fibphot-primary: #2564a0;
@@ -30,21 +35,22 @@ html, body, .bk-root {
   background: var(--fibphot-bg);
 }
 .fibphot-app {
-  background: radial-gradient(circle at top left, #eef7ff 0, #f5f7fb 33%, #ffffff 100%);
+  background: var(--fibphot-bg);
 }
 .fibphot-header {
   align-items: center;
-  padding: 0.65rem 1rem;
-  border-bottom: 1px solid var(--fibphot-border);
-  background: linear-gradient(135deg, #102f4e 0%, #2564a0 55%, #15a3a3 120%);
-  color: white;
-  box-shadow: 0 8px 24px rgba(16, 47, 78, 0.18);
+  padding: 0.62rem 0.95rem;
+  min-height: 54px;
+  border-bottom: 1px solid #0f3355;
+  background: #153f67;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(16, 47, 78, 0.18);
 }
 .fibphot-title h1,
 .fibphot-title h2,
 .fibphot-title h3,
 .fibphot-title p {
-  color: white;
+  color: #ffffff;
   margin: 0;
 }
 .fibphot-title h2 {
@@ -52,24 +58,67 @@ html, body, .bk-root {
   letter-spacing: -0.03em;
 }
 .fibphot-title p {
-  margin-top: 0.12rem;
-  font-size: 0.82rem;
-  opacity: 0.82;
+  display: none;
+}
+.fibphot-shell {
+  height: calc(100vh - 55px);
+  width: 100vw;
+  overflow: hidden;
+  background: var(--fibphot-bg);
 }
 .fibphot-sidebar {
   overflow: auto;
-  min-width: 320px;
-  max-width: 1000px;
-  height: calc(100vh - 72px);
+  min-width: 280px;
+  max-width: min(1100px, 75vw);
+  height: calc(100vh - 55px);
   padding: 0.75rem 0.9rem 0.75rem 0.75rem;
   border-right: 1px solid var(--fibphot-border);
-  background: rgba(248, 250, 252, 0.92);
-  backdrop-filter: blur(8px);
+  background: #f8fafc;
+  flex: 0 0 auto !important;
+  resize: horizontal;
 }
+
+.fibphot-sidebar > * {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+.fibphot-sidebar .bk-card,
+.fibphot-sidebar .bk-Card,
+.fibphot-sidebar .bk-Column,
+.fibphot-sidebar .bk-Row,
+.fibphot-sidebar .bk-input-group,
+.fibphot-sidebar .bk-input,
+.fibphot-sidebar input,
+.fibphot-sidebar textarea,
+.fibphot-sidebar select {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+.fibphot-sidebar .bk-Row {
+  min-width: 0 !important;
+}
+.fibphot-sidebar .fibphot-card {
+  overflow-x: hidden;
+}
+.fibphot-sidebar .fibphot-card .bk-card-header,
+.fibphot-sidebar .fibphot-card .bk-Card-header,
+.fibphot-sidebar .fibphot-card .card-header {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
 .fibphot-main {
-  overflow: auto;
-  height: calc(100vh - 72px);
+  overflow: hidden;
+  height: calc(100vh - 55px);
   padding: 0.75rem;
+  flex: 1 1 auto !important;
+  min-width: 420px;
+}
+.fibphot-main-split {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 .fibphot-card {
   border: 1px solid var(--fibphot-border);
@@ -81,10 +130,23 @@ html, body, .bk-root {
 .fibphot-card .card-header,
 .fibphot-card .accordion-header,
 .fibphot-card .bk-Card-header {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  background: #f8fafc;
   border-bottom: 1px solid var(--fibphot-border);
   color: var(--fibphot-primary-dark);
   font-weight: 650;
+}
+.fibphot-plot-panel {
+  resize: vertical;
+  overflow: auto;
+  min-height: 300px;
+  height: 56vh;
+  max-height: calc(100vh - 235px);
+  flex: 0 0 auto !important;
+}
+.fibphot-results-panel {
+  overflow: auto;
+  min-height: 160px;
+  flex: 1 1 auto !important;
 }
 .fibphot-resizable-y {
   resize: vertical;
@@ -97,6 +159,23 @@ html, body, .bk-root {
   color: rgba(255, 255, 255, 0.78);
   font-size: 0.84rem;
 }
+.fibphot-trace-options {
+  background: #ffffff;
+  border: 1px solid var(--fibphot-border);
+  border-radius: 12px;
+  padding: 0.4rem 0.5rem 0.3rem 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.fibphot-trace-options .bk-tabs-header {
+  border-bottom: 1px solid var(--fibphot-border);
+}
+.fibphot-trace-options .bk-tab {
+  font-weight: 600;
+}
+.fibphot-compact-row {
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
 .bk-input, input, textarea, select {
   border-radius: 8px !important;
 }
@@ -104,6 +183,141 @@ html, body, .bk-root {
   border-radius: 9px !important;
   font-weight: 600 !important;
 }
+
+.fibphot-sidebar-hidden .fibphot-main {
+  min-width: 0 !important;
+}
+
+/* Stateful split panes driven by FibPhotSplitPane ReactiveHTML. */
+.fibphot-split-pane {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--fibphot-bg);
+}
+.fibphot-split-horizontal {
+  flex-direction: row;
+}
+.fibphot-split-vertical {
+  flex-direction: column;
+}
+.fibphot-split-first,
+.fibphot-split-second {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.fibphot-split-horizontal > .fibphot-split-first {
+  flex: 0 0 var(--fibphot-split);
+  width: var(--fibphot-split);
+  max-width: calc(100% - var(--fibphot-handle));
+}
+.fibphot-split-vertical > .fibphot-split-first {
+  flex: 0 0 var(--fibphot-split);
+  height: var(--fibphot-split);
+  max-height: calc(100% - var(--fibphot-handle));
+}
+.fibphot-split-second {
+  flex: 1 1 auto;
+}
+.fibphot-split-handle {
+  flex: 0 0 var(--fibphot-handle);
+  min-width: var(--fibphot-handle);
+  min-height: var(--fibphot-handle);
+  box-sizing: border-box;
+  position: relative;
+  z-index: 40;
+  background: #d7e2ef;
+  touch-action: none;
+  user-select: none;
+}
+.fibphot-split-horizontal > .fibphot-split-handle {
+  width: var(--fibphot-handle);
+  cursor: col-resize;
+  border-left: 1px solid #c8d3e2;
+  border-right: 1px solid #c8d3e2;
+}
+.fibphot-split-vertical > .fibphot-split-handle {
+  height: var(--fibphot-handle);
+  cursor: row-resize;
+  border-top: 1px solid #c8d3e2;
+  border-bottom: 1px solid #c8d3e2;
+}
+.fibphot-split-horizontal > .fibphot-split-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 42px;
+  transform: translate(-50%, -50%);
+  border-left: 1px solid #7189a5;
+  border-right: 1px solid #7189a5;
+  opacity: 0.75;
+}
+.fibphot-split-vertical > .fibphot-split-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 58px;
+  height: 2px;
+  transform: translate(-50%, -50%);
+  border-top: 1px solid #7189a5;
+  border-bottom: 1px solid #7189a5;
+  opacity: 0.75;
+}
+.fibphot-split-handle:hover,
+.fibphot-split-dragging > .fibphot-split-handle {
+  background: #c4d2e3;
+}
+.fibphot-split-pane.false > .fibphot-split-first,
+.fibphot-split-pane.false > .fibphot-split-handle,
+.fibphot-split-pane.False > .fibphot-split-first,
+.fibphot-split-pane.False > .fibphot-split-handle {
+  display: none !important;
+}
+.fibphot-shell {
+  height: calc(100vh - 55px);
+}
+.fibphot-shell > .bk-panel-models-reactive_html-ReactiveHTML,
+.fibphot-shell > .bk-ReactiveHTML {
+  height: 100% !important;
+  width: 100% !important;
+}
+.fibphot-sidebar {
+  resize: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+}
+.fibphot-sidebar * {
+  box-sizing: border-box !important;
+}
+.fibphot-sidebar .bk-Row {
+  flex-wrap: wrap !important;
+}
+.fibphot-sidebar .bk-btn {
+  max-width: 100% !important;
+  white-space: normal !important;
+}
+.fibphot-plot-panel {
+  resize: none !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+.fibphot-results-panel {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
 """
 
 PLOT_PRIMARY = "#2564A0"
@@ -131,6 +345,7 @@ PLOT_CHANNELS = (
     "#BE123C",
     "#4D7C0F",
 )
+
 
 def _require_panel():
     try:
@@ -176,7 +391,9 @@ def _downsample(
             peak_idx = np.searchsorted(t, preserve)
             peak_idx = np.clip(peak_idx, 0, t.size - 1)
             prev_idx = np.clip(peak_idx - 1, 0, t.size - 1)
-            use_prev = np.abs(t[prev_idx] - preserve) < np.abs(t[peak_idx] - preserve)
+            use_prev = np.abs(t[prev_idx] - preserve) < np.abs(
+                t[peak_idx] - preserve
+            )
             peak_idx[use_prev] = prev_idx[use_prev]
             idx = np.unique(np.concatenate([idx, peak_idx]))
 
@@ -209,7 +426,10 @@ def _first_value(options: dict[str, str]) -> str | None:
 def _state_option_label(index: int, state: Any) -> str:
     subject = getattr(state, "subject", None) or "unknown"
     meta = getattr(state, "metadata", {}) or {}
-    parent = meta.get("source_parent") or Path(str(meta.get("source_path", ""))).parent.name
+    parent = (
+        meta.get("source_parent")
+        or Path(str(meta.get("source_path", ""))).parent.name
+    )
     return f"{index}: {subject} / {parent}"
 
 
@@ -280,6 +500,251 @@ def _channel_raw_colour(channel: str | None, *, fallback_index: int = 0) -> str:
     return _channel_colour(channel, fallback_index=fallback_index)
 
 
+_FIBPHOT_SPLIT_PANE_CLASS: Any | None = None
+
+
+def _split_pane_component_type():
+    """Return the local ReactiveHTML split-pane component class.
+
+    The class is defined lazily so importing ``fibphot.gui.app`` does not require
+    Panel/param until the GUI is actually launched.
+    """
+    global _FIBPHOT_SPLIT_PANE_CLASS
+    if _FIBPHOT_SPLIT_PANE_CLASS is not None:
+        return _FIBPHOT_SPLIT_PANE_CLASS
+
+    import param  # type: ignore[import-not-found]
+    from panel.reactive import ReactiveHTML  # type: ignore[import-not-found]
+
+    class FibPhotSplitPane(ReactiveHTML):
+        """A small Panel-native split pane with stateful draggable sizing.
+
+        Dragging the handle updates ``split`` through ReactiveHTML's synced
+        ``data`` object.  The first pane's pixel width/height is therefore
+        available in Python state and can also be driven from ordinary widgets.
+        """
+
+        first = param.Parameter(
+            doc="Panel object rendered before the splitter."
+        )
+        second = param.Parameter(
+            doc="Panel object rendered after the splitter."
+        )
+        orientation = param.Selector(
+            default="horizontal",
+            objects=["horizontal", "vertical"],
+            doc="Split direction. Horizontal resizes width; vertical resizes height.",
+        )
+        split = param.Integer(
+            default=540,
+            bounds=(0, None),
+            doc="Pixel size of the first pane.",
+        )
+        min_first = param.Integer(default=240, bounds=(0, None))
+        min_second = param.Integer(default=240, bounds=(0, None))
+        handle_size = param.Integer(default=8, bounds=(4, 24))
+        first_visible = param.Boolean(default=True)
+
+        _child_config = {"first": "model", "second": "model"}
+
+        _template = """
+<div id="root"
+     class="fibphot-split-pane fibphot-split-${orientation} ${first_visible}"
+     style="--fibphot-split: ${split}px; --fibphot-handle: ${handle_size}px;">
+  <div id="first" class="fibphot-split-first">${first}</div>
+  <div id="handle" class="fibphot-split-handle"
+       role="separator"
+       aria-orientation="${orientation}"
+       title="Drag to resize"
+       onpointerdown="${script('start_drag')}"></div>
+  <div id="second" class="fibphot-split-second">${second}</div>
+</div>
+"""
+
+        _stylesheets = [
+            """
+:host {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: block;
+}
+.fibphot-split-pane {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.fibphot-split-horizontal { flex-direction: row; }
+.fibphot-split-vertical { flex-direction: column; }
+.fibphot-split-first,
+.fibphot-split-second {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.fibphot-split-horizontal > .fibphot-split-first {
+  flex: 0 0 var(--fibphot-split);
+  width: var(--fibphot-split);
+  max-width: calc(100% - var(--fibphot-handle));
+}
+.fibphot-split-vertical > .fibphot-split-first {
+  flex: 0 0 var(--fibphot-split);
+  height: var(--fibphot-split);
+  max-height: calc(100% - var(--fibphot-handle));
+}
+.fibphot-split-second { flex: 1 1 auto; }
+.fibphot-split-handle {
+  flex: 0 0 var(--fibphot-handle);
+  min-width: var(--fibphot-handle);
+  min-height: var(--fibphot-handle);
+  box-sizing: border-box;
+  position: relative;
+  z-index: 40;
+  background: #d7e2ef;
+  touch-action: none;
+  user-select: none;
+}
+.fibphot-split-horizontal > .fibphot-split-handle {
+  width: var(--fibphot-handle);
+  cursor: col-resize;
+  border-left: 1px solid #c8d3e2;
+  border-right: 1px solid #c8d3e2;
+}
+.fibphot-split-vertical > .fibphot-split-handle {
+  height: var(--fibphot-handle);
+  cursor: row-resize;
+  border-top: 1px solid #c8d3e2;
+  border-bottom: 1px solid #c8d3e2;
+}
+.fibphot-split-horizontal > .fibphot-split-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 42px;
+  transform: translate(-50%, -50%);
+  border-left: 1px solid #7189a5;
+  border-right: 1px solid #7189a5;
+  opacity: 0.75;
+}
+.fibphot-split-vertical > .fibphot-split-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 58px;
+  height: 2px;
+  transform: translate(-50%, -50%);
+  border-top: 1px solid #7189a5;
+  border-bottom: 1px solid #7189a5;
+  opacity: 0.75;
+}
+.fibphot-split-handle:hover,
+.fibphot-split-dragging > .fibphot-split-handle { background: #c4d2e3; }
+.fibphot-split-pane.false > .fibphot-split-first,
+.fibphot-split-pane.false > .fibphot-split-handle,
+.fibphot-split-pane.False > .fibphot-split-first,
+.fibphot-split-pane.False > .fibphot-split-handle { display: none !important; }
+"""
+        ]
+
+        _scripts = {
+            "render": "self.apply_state(); self.notify_resize();",
+            "after_layout": "self.apply_state(); self.notify_resize();",
+            "split": "root.style.setProperty('--fibphot-split', data.split + 'px'); self.notify_resize();",
+            "orientation": "self.apply_state(); self.notify_resize();",
+            "first_visible": "self.apply_state(); self.notify_resize();",
+            "handle_size": "root.style.setProperty('--fibphot-handle', data.handle_size + 'px'); self.notify_resize();",
+            "apply_state": r"""
+root.style.setProperty('--fibphot-split', data.split + 'px');
+root.style.setProperty('--fibphot-handle', data.handle_size + 'px');
+root.classList.toggle('fibphot-split-horizontal', data.orientation === 'horizontal');
+root.classList.toggle('fibphot-split-vertical', data.orientation === 'vertical');
+root.classList.toggle('true', !!data.first_visible);
+root.classList.toggle('false', !data.first_visible);
+""",
+            "notify_resize": r"""
+window.dispatchEvent(new Event('resize'));
+requestAnimationFrame(function() { window.dispatchEvent(new Event('resize')); });
+setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 80);
+""",
+            "start_drag": r"""
+const ev = state.event;
+if (!ev || (ev.button !== undefined && ev.button !== 0)) {
+  return;
+}
+ev.preventDefault();
+ev.stopPropagation();
+
+const horizontal = data.orientation === 'horizontal';
+const startPos = horizontal ? ev.clientX : ev.clientY;
+const startSplit = Number(data.split || 0);
+const rect = root.getBoundingClientRect();
+const total = horizontal ? rect.width : rect.height;
+const minFirst = Math.max(0, Number(data.min_first || 0));
+const minSecond = Math.max(0, Number(data.min_second || 0));
+const handlePx = Math.max(0, Number(data.handle_size || 0));
+const maxSplit = Math.max(minFirst, total - minSecond - handlePx);
+let lastSplit = Math.round(Math.max(minFirst, Math.min(maxSplit, startSplit)));
+let frame = null;
+
+function applySplit(value) {
+  const next = Math.round(Math.max(minFirst, Math.min(maxSplit, value)));
+  if (next === lastSplit) {
+    return;
+  }
+  lastSplit = next;
+  data.split = next;
+  root.style.setProperty('--fibphot-split', next + 'px');
+  if (frame == null) {
+    frame = requestAnimationFrame(function() {
+      frame = null;
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
+}
+
+function move(moveEv) {
+  moveEv.preventDefault();
+  const pos = horizontal ? moveEv.clientX : moveEv.clientY;
+  applySplit(startSplit + pos - startPos);
+}
+
+function cleanup(upEv) {
+  if (upEv) {
+    upEv.preventDefault();
+  }
+  root.classList.remove('fibphot-split-dragging');
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+  try { handle.releasePointerCapture(ev.pointerId); } catch (err) {}
+  window.removeEventListener('pointermove', move, true);
+  window.removeEventListener('pointerup', cleanup, true);
+  window.removeEventListener('pointercancel', cleanup, true);
+  data.split = lastSplit;
+  self.notify_resize();
+}
+
+root.classList.add('fibphot-split-dragging');
+document.body.style.cursor = horizontal ? 'col-resize' : 'row-resize';
+document.body.style.userSelect = 'none';
+try { handle.setPointerCapture(ev.pointerId); } catch (err) {}
+window.addEventListener('pointermove', move, true);
+window.addEventListener('pointerup', cleanup, true);
+window.addEventListener('pointercancel', cleanup, true);
+""",
+        }
+
+    _FIBPHOT_SPLIT_PANE_CLASS = FibPhotSplitPane
+    return FibPhotSplitPane
+
+
 class FibPhotGUI:
     """Interactive local GUI for fibphot.
 
@@ -301,8 +766,12 @@ class FibPhotGUI:
             placeholder="/path/to/session.doric or processed_state.h5",
             sizing_mode="stretch_width",
         )
-        self.load_button = self.pn.widgets.Button(name="Load", button_type="primary")
-        self.browse_input = self.pn.widgets.Checkbox(name="Browse files", value=False)
+        self.load_button = self.pn.widgets.Button(
+            name="Load", button_type="primary"
+        )
+        self.browse_input = self.pn.widgets.Checkbox(
+            name="Browse files", value=False
+        )
         try:
             self.input_file_selector = self.pn.widgets.FileSelector(
                 name="Browse input file",
@@ -323,8 +792,12 @@ class FibPhotGUI:
             placeholder="Relative to output directory, or absolute path",
             sizing_mode="stretch_width",
         )
-        self.save_session_button = self.pn.widgets.Button(name="Save GUI session")
-        self.load_session_button = self.pn.widgets.Button(name="Load GUI session", button_type="primary")
+        self.save_session_button = self.pn.widgets.Button(
+            name="Save GUI session"
+        )
+        self.load_session_button = self.pn.widgets.Button(
+            name="Load GUI session", button_type="primary"
+        )
         self.status = self.pn.pane.Markdown("No file loaded.")
         self.history_policy = self.pn.widgets.Select(
             name="History policy",
@@ -351,8 +824,12 @@ class FibPhotGUI:
             sizing_mode="stretch_width",
         )
         self.show_raw = self.pn.widgets.Checkbox(name="Overlay raw", value=True)
-        self.show_processed = self.pn.widgets.Checkbox(name="Show processed", value=True)
-        self.show_peaks = self.pn.widgets.Checkbox(name="Overlay latest peak result", value=True)
+        self.show_processed = self.pn.widgets.Checkbox(
+            name="Show processed", value=True
+        )
+        self.show_peaks = self.pn.widgets.Checkbox(
+            name="Overlay latest peak result", value=True
+        )
         self.max_points = self.pn.widgets.IntInput(
             name="Max plotted points",
             value=20000,
@@ -439,7 +916,7 @@ class FibPhotGUI:
             },
         )
         self.plot_pane = self.pn.pane.Bokeh(
-            min_height=470,
+            min_height=260,
             sizing_mode="stretch_both",
         )
 
@@ -451,13 +928,21 @@ class FibPhotGUI:
             options=stage_options,
             value=first_stage,
         )
-        self.stage_add_editor = ParameterEditor(self.pn, title="Stage parameters")
+        self.stage_add_editor = ParameterEditor(
+            self.pn, title="Stage parameters"
+        )
         self.stage_add_editor.rebuild(
             STAGE_REGISTRY.get(first_stage) if first_stage else None,
-            values=self._smart_stage_values(first_stage, STAGE_REGISTRY.default_params(first_stage)) if first_stage else None,
+            values=self._smart_stage_values(
+                first_stage, STAGE_REGISTRY.default_params(first_stage)
+            )
+            if first_stage
+            else None,
             channel_names=self._channel_names(),
         )
-        self.add_stage_button = self.pn.widgets.Button(name="Add stage", button_type="success")
+        self.add_stage_button = self.pn.widgets.Button(
+            name="Add stage", button_type="success"
+        )
 
         self.pipeline_table = self.pn.widgets.Tabulator(
             value=self._pipeline_frame(),
@@ -465,17 +950,31 @@ class FibPhotGUI:
             selectable=1,
             disabled=True,
         )
-        self.edit_stage_select = self.pn.widgets.Select(name="Selected stage", options=[])
-        self.edit_stage_enabled = self.pn.widgets.Checkbox(name="Enabled", value=True)
-        self.stage_edit_editor = ParameterEditor(self.pn, title="Selected stage parameters")
-        self.apply_stage_button = self.pn.widgets.Button(name="Apply stage edit", button_type="primary")
-        self.remove_stage_button = self.pn.widgets.Button(name="Remove stage", button_type="danger")
+        self.edit_stage_select = self.pn.widgets.Select(
+            name="Selected stage", options=[]
+        )
+        self.edit_stage_enabled = self.pn.widgets.Checkbox(
+            name="Enabled", value=True
+        )
+        self.stage_edit_editor = ParameterEditor(
+            self.pn, title="Selected stage parameters"
+        )
+        self.apply_stage_button = self.pn.widgets.Button(
+            name="Apply stage edit", button_type="primary"
+        )
+        self.remove_stage_button = self.pn.widgets.Button(
+            name="Remove stage", button_type="danger"
+        )
         self.stage_up_button = self.pn.widgets.Button(name="Move up")
         self.stage_down_button = self.pn.widgets.Button(name="Move down")
         self.undo_button = self.pn.widgets.Button(name="Undo")
         self.redo_button = self.pn.widgets.Button(name="Redo")
-        self.recompute_button = self.pn.widgets.Button(name="Recompute", button_type="primary")
-        self.pipeline_json_path = self.pn.widgets.TextInput(name="Pipeline JSON", value="pipeline.json")
+        self.recompute_button = self.pn.widgets.Button(
+            name="Recompute", button_type="primary"
+        )
+        self.pipeline_json_path = self.pn.widgets.TextInput(
+            name="Pipeline JSON", value="pipeline.json"
+        )
         self.save_pipeline_button = self.pn.widgets.Button(name="Save pipeline")
         self.load_pipeline_button = self.pn.widgets.Button(name="Load pipeline")
 
@@ -487,18 +986,30 @@ class FibPhotGUI:
             options=analysis_options,
             value=first_analysis,
         )
-        self.analysis_editor = ParameterEditor(self.pn, title="Analysis parameters")
+        self.analysis_editor = ParameterEditor(
+            self.pn, title="Analysis parameters"
+        )
         self.analysis_editor.rebuild(
             ANALYSIS_REGISTRY.get(first_analysis) if first_analysis else None,
             channel_names=self._channel_names(),
         )
-        self.run_analysis_button = self.pn.widgets.Button(name="Run analysis", button_type="success")
-        self.rerun_analyses_button = self.pn.widgets.Button(name="Rerun saved analyses", button_type="primary")
+        self.run_analysis_button = self.pn.widgets.Button(
+            name="Run analysis", button_type="success"
+        )
+        self.rerun_analyses_button = self.pn.widgets.Button(
+            name="Rerun saved analyses", button_type="primary"
+        )
         self.clear_results_button = self.pn.widgets.Button(name="Clear results")
         self.results_summary = self.pn.pane.Markdown("No analyses run.")
-        self.result_select = self.pn.widgets.Select(name="Selected result", options=[])
-        self.metrics_table = self.pn.widgets.Tabulator(value=self._empty_frame(), height=210, disabled=True)
-        self.arrays_table = self.pn.widgets.Tabulator(value=self._empty_frame(), height=260, disabled=True)
+        self.result_select = self.pn.widgets.Select(
+            name="Selected result", options=[]
+        )
+        self.metrics_table = self.pn.widgets.Tabulator(
+            value=self._empty_frame(), height=210, disabled=True
+        )
+        self.arrays_table = self.pn.widgets.Tabulator(
+            value=self._empty_frame(), height=260, disabled=True
+        )
 
         # Export widgets ------------------------------------------------------
         self.export_dir = self.pn.widgets.TextInput(
@@ -506,8 +1017,12 @@ class FibPhotGUI:
             value="fibphot_export",
             placeholder="Relative to output directory, or an absolute path",
         )
-        self.export_button = self.pn.widgets.Button(name="Export all", button_type="primary")
-        self.export_selected_button = self.pn.widgets.Button(name="Export selected result")
+        self.export_button = self.pn.widgets.Button(
+            name="Export all", button_type="primary"
+        )
+        self.export_selected_button = self.pn.widgets.Button(
+            name="Export selected result"
+        )
         self.export_status = self.pn.pane.Markdown("")
 
         # Batch/multi-session widgets ---------------------------------------
@@ -532,14 +1047,28 @@ class FibPhotGUI:
             name="Metadata match column",
             value="subject",
         )
-        self.load_batch_button = self.pn.widgets.Button(name="Load batch", button_type="primary")
-        self.process_batch_button = self.pn.widgets.Button(name="Apply pipeline to batch", button_type="primary")
-        self.run_batch_selected_button = self.pn.widgets.Button(name="Run selected analysis on batch", button_type="success")
-        self.rerun_batch_button = self.pn.widgets.Button(name="Rerun saved analyses on batch", button_type="primary")
-        self.export_batch_button = self.pn.widgets.Button(name="Export batch", button_type="primary")
+        self.load_batch_button = self.pn.widgets.Button(
+            name="Load batch", button_type="primary"
+        )
+        self.process_batch_button = self.pn.widgets.Button(
+            name="Apply pipeline to batch", button_type="primary"
+        )
+        self.run_batch_selected_button = self.pn.widgets.Button(
+            name="Run selected analysis on batch", button_type="success"
+        )
+        self.rerun_batch_button = self.pn.widgets.Button(
+            name="Rerun saved analyses on batch", button_type="primary"
+        )
+        self.export_batch_button = self.pn.widgets.Button(
+            name="Export batch", button_type="primary"
+        )
         self.batch_status = self.pn.pane.Markdown("No batch loaded.")
-        self.batch_session_select = self.pn.widgets.Select(name="Inspect session", options=[])
-        self.open_batch_session_button = self.pn.widgets.Button(name="Open selected session")
+        self.batch_session_select = self.pn.widgets.Select(
+            name="Inspect session", options=[]
+        )
+        self.open_batch_session_button = self.pn.widgets.Button(
+            name="Open selected session"
+        )
         self.batch_groupby = self.pn.widgets.TextInput(
             name="Group by metadata",
             value="",
@@ -552,22 +1081,50 @@ class FibPhotGUI:
             placeholder="Blank = all numeric metrics; or comma-separated names",
             sizing_mode="stretch_width",
         )
-        self.summarise_batch_button = self.pn.widgets.Button(name="Summarise batch metrics")
-        self.batch_sessions_table = self.pn.widgets.Tabulator(value=self._empty_frame(), height=240, disabled=True)
-        self.batch_metrics_table = self.pn.widgets.Tabulator(value=self._empty_frame(), height=260, disabled=True)
-        self.batch_grouped_table = self.pn.widgets.Tabulator(value=self._empty_frame(), height=260, disabled=True)
-        self.batch_plot_pane = self.pn.pane.Bokeh(height=320, sizing_mode="stretch_width")
+        self.summarise_batch_button = self.pn.widgets.Button(
+            name="Summarise batch metrics"
+        )
+        self.batch_sessions_table = self.pn.widgets.Tabulator(
+            value=self._empty_frame(), height=240, disabled=True
+        )
+        self.batch_metrics_table = self.pn.widgets.Tabulator(
+            value=self._empty_frame(), height=260, disabled=True
+        )
+        self.batch_grouped_table = self.pn.widgets.Tabulator(
+            value=self._empty_frame(), height=260, disabled=True
+        )
+        self.batch_plot_pane = self.pn.pane.Bokeh(
+            height=320, sizing_mode="stretch_width"
+        )
 
         # Layout widgets ------------------------------------------------------
         self.sidebar_width = self.pn.widgets.IntSlider(
             name="Sidebar width",
             value=540,
-            start=320,
-            end=1000,
+            start=280,
+            end=1100,
             step=10,
             width=260,
         )
+        self.trace_height = self.pn.widgets.IntSlider(
+            name="Trace viewer height",
+            value=560,
+            start=320,
+            end=1200,
+            step=10,
+            width=260,
+        )
+        self.sidebar_toggle_button = self.pn.widgets.Button(
+            name="Hide sidebar",
+            button_type="default",
+            width=120,
+        )
         self._sidebar_container = None
+        self._sidebar_splitpane = None
+        self._trace_splitpane = None
+        self._sidebar_visible = True
+        self._syncing_sidebar_width = False
+        self._syncing_trace_height = False
 
         self._wire_callbacks()
         self._refresh_all()
@@ -582,7 +1139,9 @@ class FibPhotGUI:
 
     def _channel_names(self) -> list[str]:
         if self.session.current_state is None:
-            if self.session.current_collection is not None and len(self.session.current_collection):
+            if self.session.current_collection is not None and len(
+                self.session.current_collection
+            ):
                 return list(self.session.current_collection[0].channel_names)
             return []
         return list(self.session.current_state.channel_names)
@@ -660,7 +1219,9 @@ class FibPhotGUI:
         defaults = self._default_plot_channels(names)
         return defaults[0] if defaults else None
 
-    def _smart_stage_values(self, key: str, values: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _smart_stage_values(
+        self, key: str, values: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         out = dict(values or {})
         if key not in {"IsosbesticRegression", "IsosbesticDff"}:
             return out
@@ -684,12 +1245,18 @@ class FibPhotGUI:
 
         rows = []
         for i, cfg in enumerate(self.session.pipeline):
-            spec = STAGE_REGISTRY.get(cfg.name) if cfg.name in STAGE_REGISTRY else None
+            spec = (
+                STAGE_REGISTRY.get(cfg.name)
+                if cfg.name in STAGE_REGISTRY
+                else None
+            )
             rows.append(
                 {
                     "#": i,
                     "enabled": cfg.enabled,
-                    "stage": spec.display_name if spec is not None else cfg.name,
+                    "stage": spec.display_name
+                    if spec is not None
+                    else cfg.name,
                     "key": cfg.name,
                     "params": json.dumps(cfg.params, ensure_ascii=False),
                 }
@@ -703,7 +1270,9 @@ class FibPhotGUI:
         self.load_button.on_click(self._on_load)
         self.browse_input.param.watch(self._on_browse_input_toggle, "value")
         if hasattr(self.input_file_selector, "param"):
-            self.input_file_selector.param.watch(self._on_input_file_selected, "value")
+            self.input_file_selector.param.watch(
+                self._on_input_file_selected, "value"
+            )
         self.save_session_button.on_click(self._on_save_session)
         self.load_session_button.on_click(self._on_load_session)
         self.output_dir_button.on_click(self._on_output_dir)
@@ -726,8 +1295,16 @@ class FibPhotGUI:
             self.aligned_channel_mode,
         ):
             widget.param.watch(lambda *_: self._update_plot(), "value")
-        self.batch_trace_groupby.param.watch(lambda *_: (self._refresh_batch_trace_groups(), self._update_plot()), "value")
+        self.batch_trace_groupby.param.watch(
+            lambda *_: (
+                self._refresh_batch_trace_groups(),
+                self._update_plot(),
+            ),
+            "value",
+        )
         self.sidebar_width.param.watch(self._on_sidebar_width, "value")
+        self.trace_height.param.watch(self._on_trace_height, "value")
+        self.sidebar_toggle_button.on_click(self._on_toggle_sidebar)
 
         self.stage_select.param.watch(self._on_stage_choice, "value")
         self.add_stage_button.on_click(self._on_add_stage)
@@ -753,7 +1330,9 @@ class FibPhotGUI:
 
         self.load_batch_button.on_click(self._on_load_batch)
         self.process_batch_button.on_click(self._on_process_batch)
-        self.run_batch_selected_button.on_click(self._on_run_batch_selected_analysis)
+        self.run_batch_selected_button.on_click(
+            self._on_run_batch_selected_analysis
+        )
         self.rerun_batch_button.on_click(self._on_rerun_batch_analyses)
         self.export_batch_button.on_click(self._on_export_batch)
         self.open_batch_session_button.on_click(self._on_open_batch_session)
@@ -805,7 +1384,11 @@ class FibPhotGUI:
             # the dedicated session field is still at its default, use it.
             candidate = self.session_file_path.value.strip()
             main = self.path_input.value.strip()
-            if main and self._looks_like_gui_session(main) and candidate == "fibphot_session.h5":
+            if (
+                main
+                and self._looks_like_gui_session(main)
+                and candidate == "fibphot_session.h5"
+            ):
                 candidate = main
             path = self.session.load_session_h5(candidate)
             self._sync_widgets_from_session()
@@ -821,7 +1404,9 @@ class FibPhotGUI:
         try:
             path = self.path_input.value.strip()
             if not path:
-                raise ValueError("Enter a .doric, .h5, .hdf5 or saved fibphot GUI session file path.")
+                raise ValueError(
+                    "Enter a .doric, .h5, .hdf5 or saved fibphot GUI session file path."
+                )
             if self._looks_like_gui_session(path):
                 loaded = self.session.load_session_h5(path)
                 self.session_file_path.value = str(loaded)
@@ -843,32 +1428,101 @@ class FibPhotGUI:
 
     def _on_output_dir(self, *_: Any) -> None:
         try:
-            out = self.session.set_output_dir(self.output_dir_input.value.strip() or Path.cwd())
+            out = self.session.set_output_dir(
+                self.output_dir_input.value.strip() or Path.cwd()
+            )
             self.output_dir_input.value = str(out)
             self.status.object = f"Output directory set to `{out}`."
         except Exception as exc:
             self._set_error(exc)
 
-    def _on_sidebar_width(self, *_: Any) -> None:
+    def _apply_sidebar_width(self, width: int) -> None:
         sidebar = getattr(self, "_sidebar_container", None)
-        if sidebar is None:
+        if sidebar is not None:
+            sidebar.width = width
+            sidebar.styles = {
+                **(sidebar.styles or {}),
+                "width": "100%",
+                "max-width": "100%",
+                "min-width": "0",
+                "overflow": "auto",
+            }
+        splitpane = getattr(self, "_sidebar_splitpane", None)
+        if (
+            splitpane is not None
+            and int(getattr(splitpane, "split", width)) != width
+        ):
+            splitpane.split = width
+
+    def _apply_trace_height(self, height: int) -> None:
+        splitpane = getattr(self, "_trace_splitpane", None)
+        if (
+            splitpane is not None
+            and int(getattr(splitpane, "split", height)) != height
+        ):
+            splitpane.split = height
+
+    def _on_sidebar_width(self, *_: Any) -> None:
+        if self._syncing_sidebar_width:
             return
         width = int(self.sidebar_width.value or 540)
-        sidebar.width = width
-        sidebar.styles = {**(sidebar.styles or {}), "width": f"{width}px"}
+        self._apply_sidebar_width(width)
+
+    def _on_sidebar_split(self, event: Any) -> None:
+        width = int(event.new or self.sidebar_width.value or 540)
+        self._apply_sidebar_width(width)
+        if int(self.sidebar_width.value or 0) != width:
+            self._syncing_sidebar_width = True
+            try:
+                self.sidebar_width.value = width
+            finally:
+                self._syncing_sidebar_width = False
+
+    def _on_trace_height(self, *_: Any) -> None:
+        if self._syncing_trace_height:
+            return
+        height = int(self.trace_height.value or 560)
+        self._apply_trace_height(height)
+
+    def _on_trace_split(self, event: Any) -> None:
+        height = int(event.new or self.trace_height.value or 560)
+        if int(self.trace_height.value or 0) != height:
+            self._syncing_trace_height = True
+            try:
+                self.trace_height.value = height
+            finally:
+                self._syncing_trace_height = False
+
+    def _on_toggle_sidebar(self, *_: Any) -> None:
+        splitpane = getattr(self, "_sidebar_splitpane", None)
+        visible = not bool(self._sidebar_visible)
+        self._sidebar_visible = visible
+        if splitpane is not None:
+            splitpane.first_visible = visible
+            if visible:
+                splitpane.split = int(self.sidebar_width.value or 540)
+        self.sidebar_toggle_button.name = (
+            "Hide sidebar" if visible else "Show sidebar"
+        )
 
     def _on_stage_choice(self, event: Any) -> None:
         key = event.new
         self.stage_add_editor.rebuild(
             STAGE_REGISTRY.get(key),
-            values=self._smart_stage_values(key, STAGE_REGISTRY.default_params(key)),
+            values=self._smart_stage_values(
+                key, STAGE_REGISTRY.default_params(key)
+            ),
             channel_names=self._channel_names(),
         )
 
     def _on_add_stage(self, *_: Any) -> None:
         try:
             key = str(self.stage_select.value)
-            cfg = StageConfig(key, self._smart_stage_values(key, self.stage_add_editor.values()), True)
+            cfg = StageConfig(
+                key,
+                self._smart_stage_values(key, self.stage_add_editor.values()),
+                True,
+            )
             self.session.add_stage(cfg)
             self.status.object = f"Added `{STAGE_REGISTRY.get(key).display_name}` and recomputed."
             self._refresh_all()
@@ -884,7 +1538,9 @@ class FibPhotGUI:
     def _on_edit_stage_choice(self, *_: Any) -> None:
         idx = self._selected_stage()
         if idx is None or idx >= len(self.session.pipeline):
-            self.stage_edit_editor.rebuild(None, channel_names=self._channel_names())
+            self.stage_edit_editor.rebuild(
+                None, channel_names=self._channel_names()
+            )
             return
         cfg = self.session.pipeline[idx]
         self.edit_stage_enabled.value = cfg.enabled
@@ -900,7 +1556,13 @@ class FibPhotGUI:
             if idx is None:
                 raise ValueError("Select a stage to edit.")
             old = self.session.pipeline[idx]
-            cfg = StageConfig(old.name, self._smart_stage_values(old.name, self.stage_edit_editor.values()), self.edit_stage_enabled.value)
+            cfg = StageConfig(
+                old.name,
+                self._smart_stage_values(
+                    old.name, self.stage_edit_editor.values()
+                ),
+                self.edit_stage_enabled.value,
+            )
             self.session.update_stage(idx, cfg)
             self.status.object = f"Updated stage {idx}: `{STAGE_REGISTRY.get(cfg.name).display_name}`."
             self._refresh_all()
@@ -914,7 +1576,11 @@ class FibPhotGUI:
                 raise ValueError("Select a stage to remove.")
             name = self.session.pipeline[idx].name
             self.session.remove_stage(idx)
-            label = STAGE_REGISTRY.get(name).display_name if name in STAGE_REGISTRY else name
+            label = (
+                STAGE_REGISTRY.get(name).display_name
+                if name in STAGE_REGISTRY
+                else name
+            )
             self.status.object = f"Removed stage {idx}: `{label}`."
             self._refresh_all()
         except Exception as exc:
@@ -932,8 +1598,12 @@ class FibPhotGUI:
 
     def _undo_redo(self, action: str) -> None:
         try:
-            ok = self.session.undo() if action == "undo" else self.session.redo()
-            self.status.object = f"{action.title()} {'applied' if ok else 'stack is empty'}."
+            ok = (
+                self.session.undo() if action == "undo" else self.session.redo()
+            )
+            self.status.object = (
+                f"{action.title()} {'applied' if ok else 'stack is empty'}."
+            )
             self._refresh_all()
         except Exception as exc:
             self._set_error(exc)
@@ -948,7 +1618,9 @@ class FibPhotGUI:
 
     def _on_save_pipeline(self, *_: Any) -> None:
         try:
-            path = self.session.save_pipeline_json(self.pipeline_json_path.value)
+            path = self.session.save_pipeline_json(
+                self.pipeline_json_path.value
+            )
             self.status.object = f"Saved pipeline to `{path}`."
         except Exception as exc:
             self._set_error(exc)
@@ -956,7 +1628,9 @@ class FibPhotGUI:
     def _on_load_pipeline(self, *_: Any) -> None:
         try:
             path = self.session.output_path(self.pipeline_json_path.value)
-            self.session.load_pipeline_json(self.pipeline_json_path.value, recompute=self.session.loaded)
+            self.session.load_pipeline_json(
+                self.pipeline_json_path.value, recompute=self.session.loaded
+            )
             self.status.object = f"Loaded pipeline from `{path}`."
             self._refresh_all()
         except Exception as exc:
@@ -1019,7 +1693,9 @@ class FibPhotGUI:
             lines = [f"- `{key}`: `{path}`" for key, path in written.items()]
             self.export_status.object = "Exported:\n" + "\n".join(lines)
         except Exception as exc:
-            self.export_status.object = f"**Export failed:** `{type(exc).__name__}: {exc}`"
+            self.export_status.object = (
+                f"**Export failed:** `{type(exc).__name__}: {exc}`"
+            )
 
     def _selected_result_index(self) -> int | None:
         value = self.result_select.value
@@ -1038,13 +1714,21 @@ class FibPhotGUI:
             directory = self.session.output_path(self.export_dir.value)
             directory.mkdir(parents=True, exist_ok=True)
             result = self.session.results[idx]
-            stem = f"result_{idx:03d}_{result.name}_{result.channel}".replace("/", "_")
-            metrics = pd.DataFrame([result.metrics_row(self.session.current_state)])
+            stem = f"result_{idx:03d}_{result.name}_{result.channel}".replace(
+                "/", "_"
+            )
+            metrics = pd.DataFrame(
+                [result.metrics_row(self.session.current_state)]
+            )
             metrics_path = directory / f"{stem}_metrics.csv"
             metrics.to_csv(metrics_path, index=False)
             try:
                 event_df = self._peak_dataframe_for_result(result)
-                arrays = event_df if event_df is not None else result.arrays_frame(self.session.current_state)
+                arrays = (
+                    event_df
+                    if event_df is not None
+                    else result.arrays_frame(self.session.current_state)
+                )
             except Exception:
                 arrays = result.arrays_frame(self.session.current_state)
             lines = [f"- `metrics`: `{metrics_path}`"]
@@ -1052,9 +1736,13 @@ class FibPhotGUI:
                 arrays_path = directory / f"{stem}_arrays.csv"
                 arrays.to_csv(arrays_path, index=False)
                 lines.append(f"- `arrays`: `{arrays_path}`")
-            self.export_status.object = "Exported selected result:\n" + "\n".join(lines)
+            self.export_status.object = (
+                "Exported selected result:\n" + "\n".join(lines)
+            )
         except Exception as exc:
-            self.export_status.object = f"**Selected export failed:** `{type(exc).__name__}: {exc}`"
+            self.export_status.object = (
+                f"**Selected export failed:** `{type(exc).__name__}: {exc}`"
+            )
 
     # ------------------------------------------------------------------
     # Batch/multi-session callbacks
@@ -1068,7 +1756,11 @@ class FibPhotGUI:
             return []
         n = len(collection)
         selected = [
-            idx for idx in (_parse_option_index(v) for v in (self.batch_trace_sessions.value or []))
+            idx
+            for idx in (
+                _parse_option_index(v)
+                for v in (self.batch_trace_sessions.value or [])
+            )
             if idx is not None and 0 <= idx < n
         ]
         if selected:
@@ -1081,7 +1773,9 @@ class FibPhotGUI:
             from ..collection import metadata_value
 
             for i, state in enumerate(collection.states):
-                key = " | ".join(str(metadata_value(state, col, "")) for col in group_cols)
+                key = " | ".join(
+                    str(metadata_value(state, col, "")) for col in group_cols
+                )
                 if key == group_value:
                     out.append(i)
             return out
@@ -1107,7 +1801,9 @@ class FibPhotGUI:
 
             values: list[str] = []
             for state in collection.states:
-                key = " | ".join(str(metadata_value(state, col, "")) for col in group_cols)
+                key = " | ".join(
+                    str(metadata_value(state, col, "")) for col in group_cols
+                )
                 if key not in values:
                     values.append(key)
             options.update({v: v for v in sorted(values)})
@@ -1126,39 +1822,59 @@ class FibPhotGUI:
                 metadata_table=metadata,
                 metadata_on=self.batch_metadata_on.value.strip() or "subject",
             )
-            self.batch_status.object = f"Loaded {len(coll)} session(s) from `{directory}`."
+            self.batch_status.object = (
+                f"Loaded {len(coll)} session(s) from `{directory}`."
+            )
             self._refresh_all()
         except Exception as exc:
-            self.batch_status.object = f"**Batch load failed:** `{type(exc).__name__}: {exc}`"
+            self.batch_status.object = (
+                f"**Batch load failed:** `{type(exc).__name__}: {exc}`"
+            )
 
     def _on_process_batch(self, *_: Any) -> None:
         try:
             coll = self.session.recompute_batch(continue_on_error=True)
-            extra = f" Failed: {len(self.session.batch_errors)}." if self.session.batch_errors else ""
-            self.batch_status.object = f"Processed {len(coll)} session(s).{extra}"
+            extra = (
+                f" Failed: {len(self.session.batch_errors)}."
+                if self.session.batch_errors
+                else ""
+            )
+            self.batch_status.object = (
+                f"Processed {len(coll)} session(s).{extra}"
+            )
             self._refresh_all()
         except Exception as exc:
-            self.batch_status.object = f"**Batch processing failed:** `{type(exc).__name__}: {exc}`"
+            self.batch_status.object = (
+                f"**Batch processing failed:** `{type(exc).__name__}: {exc}`"
+            )
 
     def _on_run_batch_selected_analysis(self, *_: Any) -> None:
         try:
             key = str(self.analysis_select.value)
             cfg = AnalysisConfig(key, self.analysis_editor.values(), True)
-            report = self.session.add_batch_analysis(cfg, continue_on_error=True)
+            report = self.session.add_batch_analysis(
+                cfg, continue_on_error=True
+            )
             self.batch_status.object = f"Ran `{ANALYSIS_REGISTRY.get(key).display_name}` on {len(report.reports)} session(s)."
             self._refresh_batch()
             self._update_plot()
         except Exception as exc:
-            self.batch_status.object = f"**Batch analysis failed:** `{type(exc).__name__}: {exc}`"
+            self.batch_status.object = (
+                f"**Batch analysis failed:** `{type(exc).__name__}: {exc}`"
+            )
 
     def _on_rerun_batch_analyses(self, *_: Any) -> None:
         try:
             report = self.session.run_batch_analyses(continue_on_error=True)
-            self.batch_status.object = f"Reran saved analyses on {len(report.reports)} session(s)."
+            self.batch_status.object = (
+                f"Reran saved analyses on {len(report.reports)} session(s)."
+            )
             self._refresh_batch()
             self._update_plot()
         except Exception as exc:
-            self.batch_status.object = f"**Batch analysis failed:** `{type(exc).__name__}: {exc}`"
+            self.batch_status.object = (
+                f"**Batch analysis failed:** `{type(exc).__name__}: {exc}`"
+            )
 
     def _on_open_batch_session(self, *_: Any) -> None:
         try:
@@ -1166,28 +1882,46 @@ class FibPhotGUI:
             if idx is None:
                 raise ValueError("Select a session to inspect.")
             state = self.session.select_batch_session(idx, processed=True)
-            self.status.object = f"Opened batch session {idx}: `{state.subject}`."
+            self.status.object = (
+                f"Opened batch session {idx}: `{state.subject}`."
+            )
             self._refresh_all()
         except Exception as exc:
-            self.batch_status.object = f"**Open session failed:** `{type(exc).__name__}: {exc}`"
+            self.batch_status.object = (
+                f"**Open session failed:** `{type(exc).__name__}: {exc}`"
+            )
 
     def _on_summarise_batch(self, *_: Any) -> None:
         try:
-            vals = [v.strip() for v in self.batch_values.value.split(",") if v.strip()] or None
-            grouped = self.session.batch_grouped_metrics(self.batch_groupby.value.strip() or None, vals)
+            vals = [
+                v.strip()
+                for v in self.batch_values.value.split(",")
+                if v.strip()
+            ] or None
+            grouped = self.session.batch_grouped_metrics(
+                self.batch_groupby.value.strip() or None, vals
+            )
             self.batch_grouped_table.value = grouped
             self._update_batch_summary_plot(grouped)
-            self.batch_status.object = f"Computed grouped summary with {len(grouped)} row(s)."
+            self.batch_status.object = (
+                f"Computed grouped summary with {len(grouped)} row(s)."
+            )
         except Exception as exc:
-            self.batch_status.object = f"**Batch summary failed:** `{type(exc).__name__}: {exc}`"
+            self.batch_status.object = (
+                f"**Batch summary failed:** `{type(exc).__name__}: {exc}`"
+            )
 
     def _on_export_batch(self, *_: Any) -> None:
         try:
             written = self.session.export_batch(self.export_dir.value)
             lines = [f"- `{key}`: `{path}`" for key, path in written.items()]
-            self.batch_status.object = "Exported batch files:\n" + "\n".join(lines)
+            self.batch_status.object = "Exported batch files:\n" + "\n".join(
+                lines
+            )
         except Exception as exc:
-            self.batch_status.object = f"**Batch export failed:** `{type(exc).__name__}: {exc}`"
+            self.batch_status.object = (
+                f"**Batch export failed:** `{type(exc).__name__}: {exc}`"
+            )
 
     def _update_batch_summary_plot(self, grouped: Any) -> None:
         from bokeh.models import ColumnDataSource, Whisker
@@ -1196,11 +1930,29 @@ class FibPhotGUI:
 
         df = pd.DataFrame(grouped)
         if df.empty or "mean" not in df.columns or "metric" not in df.columns:
-            self.batch_plot_pane.object = self._empty_trace_figure("Run a grouped batch summary to plot metric means ± SEM.")
+            self.batch_plot_pane.object = self._empty_trace_figure(
+                "Run a grouped batch summary to plot metric means ± SEM."
+            )
             return
         metric = str(df["metric"].iloc[0])
         df = df[df["metric"] == metric].copy()
-        group_cols = [c for c in df.columns if c not in {"metric", "count", "mean", "std", "sem", "median", "min", "max", "q25", "q75"}]
+        group_cols = [
+            c
+            for c in df.columns
+            if c
+            not in {
+                "metric",
+                "count",
+                "mean",
+                "std",
+                "sem",
+                "median",
+                "min",
+                "max",
+                "q25",
+                "q75",
+            }
+        ]
         if group_cols:
             df["group"] = df[group_cols].astype(str).agg(" | ".join, axis=1)
         else:
@@ -1222,9 +1974,18 @@ class FibPhotGUI:
         p.toolbar.logo = None
         p.grid.grid_line_color = "#e6edf5"
         source = ColumnDataSource(df)
-        p.circle(x="group", y="mean", size=9, source=source, color=PLOT_PRIMARY, alpha=0.95)
+        p.circle(
+            x="group",
+            y="mean",
+            size=9,
+            source=source,
+            color=PLOT_PRIMARY,
+            alpha=0.95,
+        )
         if "sem" in df.columns:
-            whisker = Whisker(base="group", upper="upper", lower="lower", source=source)
+            whisker = Whisker(
+                base="group", upper="upper", lower="lower", source=source
+            )
             whisker.upper_head.size = 8
             whisker.lower_head.size = 8
             p.add_layout(whisker)
@@ -1247,15 +2008,21 @@ class FibPhotGUI:
         elif not options:
             self.batch_session_select.value = None
         # Preserve valid trace multi-selections; blank means "all sessions".
-        selected_trace = [v for v in (self.batch_trace_sessions.value or []) if v in options]
+        selected_trace = [
+            v for v in (self.batch_trace_sessions.value or []) if v in options
+        ]
         if len(selected_trace) != len(self.batch_trace_sessions.value or []):
             self.batch_trace_sessions.value = selected_trace
         self._refresh_batch_trace_groups()
         metrics = self.session.batch_metrics_dataframe()
-        self.batch_metrics_table.value = metrics.head(5000) if not metrics.empty else metrics
+        self.batch_metrics_table.value = (
+            metrics.head(5000) if not metrics.empty else metrics
+        )
         if self.batch_groupby.value.strip() and not metrics.empty:
             try:
-                grouped = self.session.batch_grouped_metrics(self.batch_groupby.value.strip())
+                grouped = self.session.batch_grouped_metrics(
+                    self.batch_groupby.value.strip()
+                )
                 self.batch_grouped_table.value = grouped
                 self._update_batch_summary_plot(grouped)
             except Exception:
@@ -1277,15 +2044,22 @@ class FibPhotGUI:
             elif current_value in (None, ""):
                 selected = []
             else:
-                selected = [str(current_value)] if str(current_value) in names else []
+                selected = (
+                    [str(current_value)] if str(current_value) in names else []
+                )
             if not selected:
                 selected = self._default_plot_channels(names)
             self.channel_select.value = selected
         else:
             self.channel_select.value = []
         self.stage_add_editor.update_channels(names)
-        if str(self.stage_select.value) in {"IsosbesticRegression", "IsosbesticDff"}:
-            self._on_stage_choice(type("Event", (), {"new": self.stage_select.value})())
+        if str(self.stage_select.value) in {
+            "IsosbesticRegression",
+            "IsosbesticDff",
+        }:
+            self._on_stage_choice(
+                type("Event", (), {"new": self.stage_select.value})()
+            )
         self.stage_edit_editor.update_channels(names)
         self.analysis_editor.update_channels(names)
         self._refresh_pipeline()
@@ -1295,7 +2069,9 @@ class FibPhotGUI:
 
     def _refresh_pipeline(self) -> None:
         self.pipeline_table.value = self._pipeline_frame()
-        options = [f"{i}: {cfg.name}" for i, cfg in enumerate(self.session.pipeline)]
+        options = [
+            f"{i}: {cfg.name}" for i, cfg in enumerate(self.session.pipeline)
+        ]
         self.edit_stage_select.options = options
         if options and self.edit_stage_select.value not in options:
             self.edit_stage_select.value = options[-1]
@@ -1305,8 +2081,13 @@ class FibPhotGUI:
 
     def _refresh_results(self) -> None:
         n = len(self.session.results)
-        self.results_summary.object = f"{n} analysis result(s)." if n else "No analyses run."
-        options = [f"{i}: {r.name} / {r.channel}" for i, r in enumerate(self.session.results)]
+        self.results_summary.object = (
+            f"{n} analysis result(s)." if n else "No analyses run."
+        )
+        options = [
+            f"{i}: {r.name} / {r.channel}"
+            for i, r in enumerate(self.session.results)
+        ]
         self.result_select.options = options
         if options and self.result_select.value not in options:
             self.result_select.value = options[-1]
@@ -1367,7 +2148,9 @@ class FibPhotGUI:
             # Non-event selected results (e.g. QC/AUC) can still have window
             # overlays. Keep them selected rather than silently switching.
             arrays = getattr(selected, "arrays", {}) or {}
-            if {"t_window", "y_window"}.issubset(arrays) or getattr(selected, "window", None) is not None:
+            if {"t_window", "y_window"}.issubset(arrays) or getattr(
+                selected, "window", None
+            ) is not None:
                 return selected
         return self._latest_peak_result()
 
@@ -1388,11 +2171,13 @@ class FibPhotGUI:
         p.toolbar.logo = None
         return p
 
-    def _new_trace_figure(self, *, title: str, x_axis_label: str, y_axis_label: str):
+    def _new_trace_figure(
+        self, *, title: str, x_axis_label: str, y_axis_label: str
+    ):
         from bokeh.plotting import figure
 
         p = figure(
-            min_height=470,
+            min_height=260,
             sizing_mode="stretch_both",
             tools="pan,wheel_zoom,box_zoom,reset,save,crosshair",
             active_scroll="wheel_zoom",
@@ -1428,7 +2213,9 @@ class FibPhotGUI:
             )
         return p
 
-    def _finish_plot(self, p: Any, hover_renderers: list[Any] | None = None) -> None:
+    def _finish_plot(
+        self, p: Any, hover_renderers: list[Any] | None = None
+    ) -> None:
         from bokeh.models import HoverTool
 
         hover_renderers = hover_renderers or []
@@ -1436,7 +2223,10 @@ class FibPhotGUI:
             p.add_tools(
                 HoverTool(
                     renderers=hover_renderers,
-                    tooltips=[("time", "@time_s{0.000}"), ("signal", "@signal{0.0000}")],
+                    tooltips=[
+                        ("time", "@time_s{0.000}"),
+                        ("signal", "@signal{0.0000}"),
+                    ],
                     mode="mouse",
                 )
             )
@@ -1499,7 +2289,9 @@ class FibPhotGUI:
                 f"Plot update failed: {type(exc).__name__}: {exc}"
             )
 
-    def _update_single_trace_plot(self, result_override: Any | None = None) -> None:
+    def _update_single_trace_plot(
+        self, result_override: Any | None = None
+    ) -> None:
         """Plot one or more channels from the currently inspected session.
 
         The normal trace viewer now accepts a multi-selection of channels.  It
@@ -1517,7 +2309,9 @@ class FibPhotGUI:
 
         channels = self._selected_plot_channels()
         if not channels:
-            self.plot_pane.object = self._empty_trace_figure("Select one or more channels to plot.")
+            self.plot_pane.object = self._empty_trace_figure(
+                "Select one or more channels to plot."
+            )
             return
 
         current = self.session.current_state
@@ -1536,15 +2330,25 @@ class FibPhotGUI:
             return
         channels = resolved_channels
 
-        result = result_override if result_override is not None else self._result_for_overlay()
-        peak_df = self._peak_dataframe_for_result(result) if result is not None else None
+        result = (
+            result_override
+            if result_override is not None
+            else self._result_for_overlay()
+        )
+        peak_df = (
+            self._peak_dataframe_for_result(result)
+            if result is not None
+            else None
+        )
         preserve_times = None
         if peak_df is not None and "x" in peak_df.columns:
             preserve_times = np.asarray(peak_df["x"], dtype=float)
 
         t = np.asarray(current.time_seconds, dtype=float)
         max_points = int(self.max_points.value or 20000)
-        title_channels = ", ".join(channels[:4]) + (" …" if len(channels) > 4 else "")
+        title_channels = ", ".join(channels[:4]) + (
+            " …" if len(channels) > 4 else ""
+        )
         p = self._new_trace_figure(
             title=f"fibphot trace viewer — {title_channels}",
             x_axis_label="Time (s)",
@@ -1555,8 +2359,12 @@ class FibPhotGUI:
         for ci, channel in enumerate(channels):
             if self.show_processed.value:
                 y = np.asarray(current.channel(channel), dtype=float)
-                tt, yy = _downsample(t, y, max_points, preserve_times=preserve_times)
-                source = ColumnDataSource({"time_s": tt, "signal": yy, "channel": [channel] * len(tt)})
+                tt, yy = _downsample(
+                    t, y, max_points, preserve_times=preserve_times
+                )
+                source = ColumnDataSource(
+                    {"time_s": tt, "signal": yy, "channel": [channel] * len(tt)}
+                )
                 r = p.line(
                     "time_s",
                     "signal",
@@ -1577,8 +2385,12 @@ class FibPhotGUI:
                 raw = self.session.raw_state
                 tr = np.asarray(raw.time_seconds, dtype=float)
                 yr = np.asarray(raw.channel(channel), dtype=float)
-                tr, yr = _downsample(tr, yr, max_points, preserve_times=preserve_times)
-                source = ColumnDataSource({"time_s": tr, "signal": yr, "channel": [channel] * len(tr)})
+                tr, yr = _downsample(
+                    tr, yr, max_points, preserve_times=preserve_times
+                )
+                source = ColumnDataSource(
+                    {"time_s": tr, "signal": yr, "channel": [channel] * len(tr)}
+                )
                 r = p.line(
                     "time_s",
                     "signal",
@@ -1595,7 +2407,9 @@ class FibPhotGUI:
             result_channel = getattr(result, "channel", None)
             display_channel = None
             if result_channel is not None:
-                display_channel = self._resolve_channel_from_names(str(result_channel), channels)
+                display_channel = self._resolve_channel_from_names(
+                    str(result_channel), channels
+                )
             if display_channel is None and len(channels) == 1:
                 display_channel = channels[0]
             if display_channel is not None:
@@ -1620,12 +2434,18 @@ class FibPhotGUI:
             return
         channel = self._primary_plot_channel()
         if not channel:
-            self.plot_pane.object = self._empty_trace_figure("Select a channel to plot.")
+            self.plot_pane.object = self._empty_trace_figure(
+                "Select a channel to plot."
+            )
             return
         try:
-            stats = collection.trace_statistics(channels=[channel], align="intersection", time_ref="start")
+            stats = collection.trace_statistics(
+                channels=[channel], align="intersection", time_ref="start"
+            )
         except Exception as exc:
-            self.plot_pane.object = self._empty_trace_figure(f"Could not align batch traces: {exc}")
+            self.plot_pane.object = self._empty_trace_figure(
+                f"Could not align batch traces: {exc}"
+            )
             return
 
         x = np.asarray(stats.time_seconds, dtype=float)
@@ -1662,9 +2482,7 @@ class FibPhotGUI:
                 )
                 hover_renderers.append(r)
             if yi.shape[0] > max_lines:
-                self.batch_status.object = (
-                    f"Displayed {max_lines} of {yi.shape[0]} aligned sessions to keep the plot responsive."
-                )
+                self.batch_status.object = f"Displayed {max_lines} of {yi.shape[0]} aligned sessions to keep the plot responsive."
 
         if mode in {"mean", "both"}:
             xx, mm = _downsample(x, mean, max_points)
@@ -1717,7 +2535,10 @@ class FibPhotGUI:
     def _aligned_channel_indices(self, result: Any) -> list[tuple[int, str]]:
         arrays = getattr(result, "arrays", {}) or {}
         names = tuple(
-            str(x) for x in np.asarray(arrays.get("aligned_channel_names", [])).tolist()
+            str(x)
+            for x in np.asarray(
+                arrays.get("aligned_channel_names", [])
+            ).tolist()
         )
         if not names:
             return []
@@ -1752,7 +2573,9 @@ class FibPhotGUI:
             return
 
         # Drop channel indices that are not valid for this result.
-        channel_info = [(ci, ch) for ci, ch in channel_info if ci < data.shape[1]]
+        channel_info = [
+            (ci, ch) for ci, ch in channel_info if ci < data.shape[1]
+        ]
         if not channel_info:
             self.plot_pane.object = self._empty_trace_figure(
                 "No selected aligned channels are present in this result."
@@ -1775,13 +2598,23 @@ class FibPhotGUI:
         finite = data[:, [ci for ci, _ in channel_info], :]
         y_min = float(np.nanmin(finite)) if np.isfinite(finite).any() else -1.0
         y_max = float(np.nanmax(finite)) if np.isfinite(finite).any() else 1.0
-        p.line([0, 0], [y_min, y_max], color="#64748b", line_dash="dashed", alpha=0.55)
+        p.line(
+            [0, 0],
+            [y_min, y_max],
+            color="#64748b",
+            line_dash="dashed",
+            alpha=0.55,
+        )
 
         for k, (ci, channel) in enumerate(channel_info):
             colour = _channel_colour(channel, fallback_index=k)
             y = data[:, ci, :]
             mean = np.nanmean(y, axis=0)
-            std = np.nanstd(y, axis=0, ddof=1) if y.shape[0] > 1 else np.zeros_like(mean)
+            std = (
+                np.nanstd(y, axis=0, ddof=1)
+                if y.shape[0] > 1
+                else np.zeros_like(mean)
+            )
             sem = std / np.sqrt(max(y.shape[0], 1))
             q25 = np.nanpercentile(y, 25, axis=0)
             q75 = np.nanpercentile(y, 75, axis=0)
@@ -1865,11 +2698,16 @@ class FibPhotGUI:
             means = np.asarray(arrays["corr_mean_by_pair"], dtype=float)
             sems = np.asarray(arrays.get("corr_sem_by_pair", []), dtype=float)
             stds = np.asarray(arrays.get("corr_std_by_pair", []), dtype=float)
-            by_event = np.asarray(arrays.get("corr_by_pair_event", []), dtype=float)
+            by_event = np.asarray(
+                arrays.get("corr_by_pair_event", []), dtype=float
+            )
             labels = [
                 str(x)
                 for x in np.asarray(
-                    arrays.get("connectivity_pair_labels", [f"pair {i}" for i in range(means.shape[0])])
+                    arrays.get(
+                        "connectivity_pair_labels",
+                        [f"pair {i}" for i in range(means.shape[0])],
+                    )
                 ).tolist()
             ]
             display = str(self.epoch_display.value or "both")
@@ -1878,7 +2716,11 @@ class FibPhotGUI:
             for pi in range(means.shape[0]):
                 colour = PLOT_CHANNELS[pi % len(PLOT_CHANNELS)]
                 label = labels[pi] if pi < len(labels) else f"pair {pi}"
-                if display in {"individual", "both"} and by_event.ndim == 3 and pi < by_event.shape[0]:
+                if (
+                    display in {"individual", "both"}
+                    and by_event.ndim == 3
+                    and pi < by_event.shape[0]
+                ):
                     for i in range(min(by_event.shape[1], 80)):
                         y = by_event[pi, i]
                         if not np.isfinite(y).any():
@@ -1897,7 +2739,11 @@ class FibPhotGUI:
                 if display in {"mean", "both"}:
                     mean = means[pi]
                     if err != "none":
-                        if err == "std" and stds.ndim == 2 and pi < stds.shape[0]:
+                        if (
+                            err == "std"
+                            and stds.ndim == 2
+                            and pi < stds.shape[0]
+                        ):
                             e = stds[pi]
                             label_err = f"{label} mean ± SD"
                         elif sems.ndim == 2 and pi < sems.shape[0]:
@@ -1930,13 +2776,25 @@ class FibPhotGUI:
         if "lag_s" in arrays and "corr_mean" in arrays:
             lag = np.asarray(arrays["lag_s"], dtype=float)
             mean = np.asarray(arrays["corr_mean"], dtype=float)
-            corr_by_event = np.asarray(arrays.get("corr_by_event", []), dtype=float)
+            corr_by_event = np.asarray(
+                arrays.get("corr_by_event", []), dtype=float
+            )
             display = str(self.epoch_display.value or "both")
             err = str(self.epoch_error.value or "sem")
             if display in {"individual", "both"} and corr_by_event.ndim == 2:
                 for i in range(min(corr_by_event.shape[0], 120)):
-                    source = ColumnDataSource({"time_s": lag, "signal": corr_by_event[i]})
-                    r = p.line("time_s", "signal", source=source, color=PLOT_RAW, alpha=0.20, line_width=0.8, legend_label="event correlations")
+                    source = ColumnDataSource(
+                        {"time_s": lag, "signal": corr_by_event[i]}
+                    )
+                    r = p.line(
+                        "time_s",
+                        "signal",
+                        source=source,
+                        color=PLOT_RAW,
+                        alpha=0.20,
+                        line_width=0.8,
+                        legend_label="event correlations",
+                    )
                     hover_renderers.append(r)
             if display in {"mean", "both"}:
                 if err != "none":
@@ -1949,9 +2807,23 @@ class FibPhotGUI:
                     else:
                         e = np.zeros_like(mean)
                         label = "mean"
-                    p.varea(x=lag, y1=mean - e, y2=mean + e, fill_color=PLOT_SHADE, fill_alpha=0.18, legend_label=label)
+                    p.varea(
+                        x=lag,
+                        y1=mean - e,
+                        y2=mean + e,
+                        fill_color=PLOT_SHADE,
+                        fill_alpha=0.18,
+                        legend_label=label,
+                    )
                 source = ColumnDataSource({"time_s": lag, "signal": mean})
-                r = p.line("time_s", "signal", source=source, color=PLOT_MEAN, line_width=2.7, legend_label="mean correlation")
+                r = p.line(
+                    "time_s",
+                    "signal",
+                    source=source,
+                    color=PLOT_MEAN,
+                    line_width=2.7,
+                    legend_label="mean correlation",
+                )
                 hover_renderers.append(r)
             self._finish_plot(p, hover_renderers)
             return
@@ -1960,7 +2832,14 @@ class FibPhotGUI:
             lag = np.asarray(arrays["lag_s"], dtype=float)
             y = np.asarray(arrays["correlation"], dtype=float)
             source = ColumnDataSource({"time_s": lag, "signal": y})
-            r = p.line("time_s", "signal", source=source, color=PLOT_MEAN, line_width=2.4, legend_label="correlation")
+            r = p.line(
+                "time_s",
+                "signal",
+                source=source,
+                color=PLOT_MEAN,
+                line_width=2.4,
+                legend_label="correlation",
+            )
             hover_renderers.append(r)
             self._finish_plot(p, hover_renderers)
             return
@@ -1979,15 +2858,32 @@ class FibPhotGUI:
                 if not np.any(m):
                     continue
                 source = ColumnDataSource({"time_s": lag[m], "signal": y[m]})
-                r = p.line("time_s", "signal", source=source, color=colour, line_width=2.4, legend_label=label)
-                p.circle("time_s", "signal", source=source, color=colour, size=5, alpha=0.75, legend_label=label)
+                r = p.line(
+                    "time_s",
+                    "signal",
+                    source=source,
+                    color=colour,
+                    line_width=2.4,
+                    legend_label=label,
+                )
+                p.circle(
+                    "time_s",
+                    "signal",
+                    source=source,
+                    color=colour,
+                    size=5,
+                    alpha=0.75,
+                    legend_label=label,
+                )
                 hover_renderers.append(r)
                 plotted = True
             if not plotted:
                 p.text(
                     x=[0],
                     y=[0.5],
-                    text=["No finite Granger p-values were returned. Try a shorter window, larger target_dt, lower max_lag_steps, or disable differencing."],
+                    text=[
+                        "No finite Granger p-values were returned. Try a shorter window, larger target_dt, lower max_lag_steps, or disable differencing."
+                    ],
                     text_align="center",
                     text_baseline="middle",
                     text_color="#5e6b7a",
@@ -2009,15 +2905,32 @@ class FibPhotGUI:
                 if not np.any(m):
                     continue
                 source = ColumnDataSource({"time_s": lag[m], "signal": y[m]})
-                r = p.line("time_s", "signal", source=source, color=colour, line_width=2.4, legend_label=label)
-                p.circle("time_s", "signal", source=source, color=colour, size=5, alpha=0.75, legend_label=label)
+                r = p.line(
+                    "time_s",
+                    "signal",
+                    source=source,
+                    color=colour,
+                    line_width=2.4,
+                    legend_label=label,
+                )
+                p.circle(
+                    "time_s",
+                    "signal",
+                    source=source,
+                    color=colour,
+                    size=5,
+                    alpha=0.75,
+                    legend_label=label,
+                )
                 hover_renderers.append(r)
                 plotted = True
             if not plotted:
                 p.text(
                     x=[0],
                     y=[0.5],
-                    text=["No finite Granger p-values were returned. Try a shorter window, larger target_dt, lower max_lag_steps, or disable differencing."],
+                    text=[
+                        "No finite Granger p-values were returned. Try a shorter window, larger target_dt, lower max_lag_steps, or disable differencing."
+                    ],
                     text_align="center",
                     text_baseline="middle",
                     text_color="#5e6b7a",
@@ -2025,7 +2938,9 @@ class FibPhotGUI:
             self._finish_plot(p, hover_renderers)
             return
 
-        self.plot_pane.object = self._empty_trace_figure("Selected result has no plottable lag/curve arrays.")
+        self.plot_pane.object = self._empty_trace_figure(
+            "Selected result has no plottable lag/curve arrays."
+        )
 
     def _add_result_overlay(
         self,
@@ -2085,18 +3000,29 @@ class FibPhotGUI:
                 pass
 
         if self.show_peaks.value:
-            df = peak_dataframe if peak_dataframe is not None else self._peak_dataframe_for_result(result)
+            df = (
+                peak_dataframe
+                if peak_dataframe is not None
+                else self._peak_dataframe_for_result(result)
+            )
             if df is not None:
                 event_times = np.asarray(df["x"], dtype=float)
                 event_y = np.asarray(df["y"], dtype=float)
-                if display_channel is not None and self.session.current_state is not None:
+                if (
+                    display_channel is not None
+                    and self.session.current_state is not None
+                ):
                     try:
-                        trace_t = np.asarray(self.session.current_state.time_seconds, dtype=float)
+                        trace_t = np.asarray(
+                            self.session.current_state.time_seconds, dtype=float
+                        )
                         trace_y = np.asarray(
                             self.session.current_state.channel(display_channel),
                             dtype=float,
                         )
-                        event_y = _values_at_times(trace_t, trace_y, event_times)
+                        event_y = _values_at_times(
+                            trace_t, trace_y, event_times
+                        )
                     except Exception:
                         pass
                 data = {
@@ -2106,9 +3032,13 @@ class FibPhotGUI:
                 if "height" in df.columns:
                     data["height"] = np.asarray(df["height"], dtype=float)
                 if "prominence" in df.columns:
-                    data["prominence"] = np.asarray(df["prominence"], dtype=float)
+                    data["prominence"] = np.asarray(
+                        df["prominence"], dtype=float
+                    )
                 if "match_score" in df.columns:
-                    data["match_score"] = np.asarray(df["match_score"], dtype=float)
+                    data["match_score"] = np.asarray(
+                        df["match_score"], dtype=float
+                    )
                 source = ColumnDataSource(data)
                 r = p.scatter(
                     "time_s",
@@ -2133,9 +3063,20 @@ class FibPhotGUI:
         self.metrics_table.sizing_mode = "stretch_width"
         self.arrays_table.sizing_mode = "stretch_width"
         button_row_style = {"flex-wrap": "wrap", "gap": "0.35rem"}
+        card_style = {
+            "width": "100%",
+            "max-width": "100%",
+            "box-sizing": "border-box",
+            "overflow-x": "hidden",
+        }
 
         file_panel = pn.Card(
-            pn.Row(self.path_input, self.load_button, sizing_mode="stretch_width"),
+            pn.Row(
+                self.path_input,
+                self.load_button,
+                sizing_mode="stretch_width",
+                styles=button_row_style,
+            ),
             self.browse_input,
             self.input_file_selector,
             pn.Row(
@@ -2165,19 +3106,17 @@ class FibPhotGUI:
             title="Session",
             collapsed=False,
             sizing_mode="stretch_width",
+            styles=card_style,
             css_classes=["fibphot-card"],
         )
         settings_panel = pn.Card(
             self.sidebar_width,
+            self.trace_height,
             self.history_policy,
-            self.plot_backend,
-            pn.pane.Markdown(
-                "<small>SVG keeps traces crisp when resized; Canvas is faster for very dense traces.</small>",
-                margin=(0, 0, 4, 0),
-            ),
             title="Settings",
             collapsed=True,
             sizing_mode="stretch_width",
+            styles=card_style,
             css_classes=["fibphot-card"],
         )
         stage_add = pn.Card(
@@ -2187,6 +3126,7 @@ class FibPhotGUI:
             title="Add processing stage",
             collapsed=True,
             sizing_mode="stretch_width",
+            styles=card_style,
             css_classes=["fibphot-card"],
         )
         stage_edit = pn.Card(
@@ -2194,12 +3134,32 @@ class FibPhotGUI:
             self.edit_stage_select,
             self.edit_stage_enabled,
             self.stage_edit_editor.container,
-            pn.Row(self.apply_stage_button, self.remove_stage_button, sizing_mode="stretch_width", styles=button_row_style),
-            pn.Row(self.stage_up_button, self.stage_down_button, self.undo_button, self.redo_button, self.recompute_button, sizing_mode="stretch_width", styles=button_row_style),
-            pn.Row(self.pipeline_json_path, self.save_pipeline_button, self.load_pipeline_button, sizing_mode="stretch_width", styles=button_row_style),
+            pn.Row(
+                self.apply_stage_button,
+                self.remove_stage_button,
+                sizing_mode="stretch_width",
+                styles=button_row_style,
+            ),
+            pn.Row(
+                self.stage_up_button,
+                self.stage_down_button,
+                self.undo_button,
+                self.redo_button,
+                self.recompute_button,
+                sizing_mode="stretch_width",
+                styles=button_row_style,
+            ),
+            pn.Row(
+                self.pipeline_json_path,
+                self.save_pipeline_button,
+                self.load_pipeline_button,
+                sizing_mode="stretch_width",
+                styles=button_row_style,
+            ),
             title="Pipeline",
             collapsed=True,
             sizing_mode="stretch_width",
+            styles=card_style,
             css_classes=["fibphot-card"],
         )
         analysis_actions = pn.Row(
@@ -2235,6 +3195,7 @@ class FibPhotGUI:
             title="Analysis",
             collapsed=True,
             sizing_mode="stretch_width",
+            styles=card_style,
             css_classes=["fibphot-card"],
         )
         batch_panel = pn.Card(
@@ -2242,11 +3203,28 @@ class FibPhotGUI:
             self.batch_pattern,
             self.batch_metadata_path,
             self.batch_metadata_on,
-            pn.Row(self.load_batch_button, self.process_batch_button, sizing_mode="stretch_width", styles=button_row_style),
-            pn.Row(self.run_batch_selected_button, self.rerun_batch_button, sizing_mode="stretch_width", styles=button_row_style),
+            pn.Row(
+                self.load_batch_button,
+                self.process_batch_button,
+                sizing_mode="stretch_width",
+                styles=button_row_style,
+            ),
+            pn.Row(
+                self.run_batch_selected_button,
+                self.rerun_batch_button,
+                sizing_mode="stretch_width",
+                styles=button_row_style,
+            ),
             self.batch_session_select,
-            pn.Row(self.open_batch_session_button, self.export_batch_button, sizing_mode="stretch_width", styles=button_row_style),
-            pn.pane.Markdown("**Batch trace overlay / average**", margin=(8, 0, 0, 0)),
+            pn.Row(
+                self.open_batch_session_button,
+                self.export_batch_button,
+                sizing_mode="stretch_width",
+                styles=button_row_style,
+            ),
+            pn.pane.Markdown(
+                "**Batch trace overlay / average**", margin=(8, 0, 0, 0)
+            ),
             self.batch_trace_sessions,
             self.batch_trace_groupby,
             self.batch_trace_group,
@@ -2257,6 +3235,7 @@ class FibPhotGUI:
             title="Batch / multi-session",
             collapsed=True,
             sizing_mode="stretch_width",
+            styles=card_style,
             css_classes=["fibphot-card"],
         )
 
@@ -2267,36 +3246,93 @@ class FibPhotGUI:
                 "or enter an absolute path to override it.</small>",
                 margin=(0, 0, 4, 0),
             ),
-            pn.Row(self.export_button, self.export_selected_button, sizing_mode="stretch_width", styles=button_row_style),
+            pn.Row(
+                self.export_button,
+                self.export_selected_button,
+                sizing_mode="stretch_width",
+                styles=button_row_style,
+            ),
             self.export_status,
             title="Export",
             collapsed=True,
             sizing_mode="stretch_width",
+            styles=card_style,
             css_classes=["fibphot-card"],
         )
 
-        trace_controls = pn.Column(
+        display_controls = pn.Column(
+            self.trace_scope,
+            sizing_mode="stretch_width",
+        )
+        channel_controls = pn.Column(
+            self.channel_select,
             pn.Row(
-                self.trace_scope,
-                self.channel_select,
                 self.show_raw,
                 self.show_processed,
                 self.show_peaks,
-                self.max_points,
                 sizing_mode="stretch_width",
-                styles={"flex-wrap": "wrap", "gap": "0.5rem"},
+                styles={"flex-wrap": "wrap", "gap": "0.6rem"},
             ),
+            sizing_mode="stretch_width",
+        )
+        batch_controls = pn.Column(
             pn.Row(
                 self.batch_trace_mode,
                 self.batch_trace_error,
-                self.result_plot_mode,
-                self.epoch_display,
-                self.epoch_error,
-                self.aligned_channel_mode,
                 sizing_mode="stretch_width",
-                styles={"flex-wrap": "wrap", "gap": "0.5rem"},
+                styles={"flex-wrap": "wrap", "gap": "0.45rem"},
+            ),
+            self.batch_trace_sessions,
+            pn.Row(
+                self.batch_trace_groupby,
+                self.batch_trace_group,
+                sizing_mode="stretch_width",
+                styles={"flex-wrap": "wrap", "gap": "0.45rem"},
             ),
             sizing_mode="stretch_width",
+        )
+        analysis_trace_controls = pn.Column(
+            pn.Row(
+                self.result_plot_mode,
+                self.aligned_channel_mode,
+                sizing_mode="stretch_width",
+                styles={"flex-wrap": "wrap", "gap": "0.45rem"},
+            ),
+            pn.Row(
+                self.epoch_display,
+                self.epoch_error,
+                sizing_mode="stretch_width",
+                styles={"flex-wrap": "wrap", "gap": "0.45rem"},
+            ),
+            sizing_mode="stretch_width",
+        )
+        plot_settings_controls = pn.Column(
+            pn.Row(
+                self.max_points,
+                self.plot_backend,
+                sizing_mode="stretch_width",
+                styles={"flex-wrap": "wrap", "gap": "0.45rem"},
+            ),
+            pn.pane.Markdown(
+                "<small>SVG keeps traces crisp when resized; Canvas is faster for very dense traces.</small>",
+                margin=(0, 0, 4, 0),
+            ),
+            sizing_mode="stretch_width",
+        )
+        trace_controls = pn.Card(
+            pn.Tabs(
+                ("Display", display_controls),
+                ("Channels", channel_controls),
+                ("Batch", batch_controls),
+                ("Selected analysis result", analysis_trace_controls),
+                ("Plot settings", plot_settings_controls),
+                dynamic=True,
+                sizing_mode="stretch_width",
+            ),
+            title="Trace options",
+            collapsed=False,
+            sizing_mode="stretch_width",
+            css_classes=["fibphot-trace-options"],
         )
         plot_panel = pn.Card(
             trace_controls,
@@ -2304,13 +3340,11 @@ class FibPhotGUI:
             title="Trace viewer",
             collapsed=False,
             sizing_mode="stretch_both",
-            css_classes=["fibphot-card", "fibphot-resizable-y"],
+            css_classes=["fibphot-card", "fibphot-plot-panel"],
             styles={
-                "resize": "vertical",
-                "overflow": "auto",
-                "min-height": "340px",
-                "height": "520px",
-                "max-height": "85vh",
+                "height": "100%",
+                "min-height": "0",
+                "overflow": "hidden",
             },
         )
 
@@ -2321,14 +3355,11 @@ class FibPhotGUI:
             ("Batch metrics", self.batch_metrics_table),
             ("Batch grouped summary", self.batch_grouped_table),
             ("Batch plot", self.batch_plot_pane),
-            sizing_mode="stretch_width",
-            css_classes=["fibphot-card", "fibphot-resizable-y"],
+            sizing_mode="stretch_both",
+            css_classes=["fibphot-card", "fibphot-results-panel"],
             styles={
-                "resize": "vertical",
                 "overflow": "auto",
-                "min-height": "180px",
-                "height": "310px",
-                "max-height": "75vh",
+                "flex": "1 1 auto",
             },
         )
 
@@ -2342,41 +3373,62 @@ class FibPhotGUI:
             export_panel,
             sizing_mode="stretch_height",
             width=int(self.sidebar_width.value),
-            min_width=320,
+            min_width=0,
             css_classes=["fibphot-sidebar"],
             styles={
-                "width": f"{int(self.sidebar_width.value)}px",
+                "width": "100%",
+                "max-width": "100%",
+                "min-width": "0",
+                "overflow": "auto",
             },
         )
         self._sidebar_container = sidebar
 
-        main = pn.Column(
-            plot_panel,
-            results_panel,
+        SplitPane = _split_pane_component_type()
+        main = SplitPane(
+            first=plot_panel,
+            second=results_panel,
+            orientation="vertical",
+            split=int(self.trace_height.value),
+            min_first=320,
+            min_second=170,
+            handle_size=8,
             sizing_mode="stretch_both",
-            min_width=520,
-            css_classes=["fibphot-main"],
+            css_classes=["fibphot-main", "fibphot-main-split"],
         )
+        self._trace_splitpane = main
+        main.param.watch(self._on_trace_split, "split")
 
         header = pn.Row(
             pn.pane.Markdown(
-                "## fibphot GUI\n<p>Interactive fibre-photometry processing, analysis and export</p>",
+                "## fibphot GUI",
                 margin=(0, 12, 0, 0),
                 css_classes=["fibphot-title"],
             ),
             pn.Spacer(sizing_mode="stretch_width"),
-            pn.pane.Markdown(
-                "Pan, wheel-zoom, box-zoom and save are available in the trace toolbar.",
-                margin=(9, 0, 0, 0),
-                css_classes=["fibphot-muted"],
-            ),
+            self.sidebar_toggle_button,
             sizing_mode="stretch_width",
             css_classes=["fibphot-header"],
         )
 
+        shell = SplitPane(
+            first=sidebar,
+            second=main,
+            orientation="horizontal",
+            split=int(self.sidebar_width.value),
+            min_first=280,
+            min_second=520,
+            handle_size=8,
+            first_visible=bool(self._sidebar_visible),
+            sizing_mode="stretch_both",
+            css_classes=["fibphot-shell"],
+            styles={"height": "calc(100vh - 55px)", "overflow": "hidden"},
+        )
+        self._sidebar_splitpane = shell
+        shell.param.watch(self._on_sidebar_split, "split")
         return pn.Column(
             header,
-            pn.Row(sidebar, main, sizing_mode="stretch_both"),
+            shell,
             sizing_mode="stretch_both",
             css_classes=["fibphot-app"],
             styles={

@@ -6,10 +6,13 @@ from pathlib import Path
 from typing import Any
 
 
-def _compression_kwargs(compression: str | None, compression_opts: int) -> dict[str, Any]:
+def _compression_kwargs(
+    compression: str | None, compression_opts: int
+) -> dict[str, Any]:
     if compression is None:
         return {}
     return {"compression": compression, "compression_opts": compression_opts}
+
 
 import numpy as np
 
@@ -24,9 +27,17 @@ def _json_safe(obj: Any) -> Any:
     if isinstance(obj, (list, tuple)):
         return [_json_safe(x) for x in obj]
     if isinstance(obj, dict):
-        return {str(k): _json_safe(v) for k, v in obj.items() if not isinstance(v, np.ndarray)}
+        return {
+            str(k): _json_safe(v)
+            for k, v in obj.items()
+            if not isinstance(v, np.ndarray)
+        }
     if isinstance(obj, np.ndarray):
-        return {"__array_ref__": True, "shape": list(obj.shape), "dtype": str(obj.dtype)}
+        return {
+            "__array_ref__": True,
+            "shape": list(obj.shape),
+            "dtype": str(obj.dtype),
+        }
     return str(obj)
 
 
@@ -52,7 +63,9 @@ def _decode_str(x: Any) -> str:
     return x.decode("utf-8") if isinstance(x, bytes) else str(x)
 
 
-def _split_payload(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
+def _split_payload(
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
     meta: dict[str, Any] = {}
     arrays: dict[str, np.ndarray] = {}
     for k, v in payload.items():
@@ -94,7 +107,9 @@ def _string_dataset_data(arr: np.ndarray) -> np.ndarray:
     arr = np.asarray(arr)
     if arr.shape == ():
         value = arr.item()
-        return np.asarray("" if value is None else _decode_str(value), dtype=object)
+        return np.asarray(
+            "" if value is None else _decode_str(value), dtype=object
+        )
     out = np.empty(arr.shape, dtype=object)
     for idx, value in np.ndenumerate(arr):
         out[idx] = "" if value is None else _decode_str(value)
@@ -128,7 +143,13 @@ def _write_array_dataset(
         # Last-resort protection for object arrays in result payloads.  Rather
         # than crashing during session save, preserve a JSON-safe string
         # representation.  Numeric and normal string arrays use the paths above.
-        encoded = np.asarray([json.dumps(_json_safe(x), ensure_ascii=False) for x in arr.ravel()], dtype=object).reshape(arr.shape)
+        encoded = np.asarray(
+            [
+                json.dumps(_json_safe(x), ensure_ascii=False)
+                for x in arr.ravel()
+            ],
+            dtype=object,
+        ).reshape(arr.shape)
         group.create_dataset(
             name,
             data=encoded,
@@ -154,7 +175,13 @@ def _decode_string_array(arr: np.ndarray) -> np.ndarray:
     return out.astype(str)
 
 
-def _write_payload_group(g: Any, payload: dict[str, Any], *, compression: str | None, compression_opts: int) -> None:
+def _write_payload_group(
+    g: Any,
+    payload: dict[str, Any],
+    *,
+    compression: str | None,
+    compression_opts: int,
+) -> None:
     meta, arrays = _split_payload(payload)
     g.attrs["attrs_json"] = _json_dumps(meta)
     ga = g.create_group("arrays")
@@ -202,19 +229,41 @@ def _read_payload_group(g: Any) -> dict[str, Any]:
     return payload
 
 
-def _write_state_group(g: Any, state: PhotometryState, *, compression: str | None, compression_opts: int) -> None:
+def _write_state_group(
+    g: Any,
+    state: PhotometryState,
+    *,
+    compression: str | None,
+    compression_opts: int,
+) -> None:
     h5py = _require_h5py()
     g.create_dataset("time_seconds", data=state.time_seconds)
-    g.create_dataset("signals", data=state.signals, **_compression_kwargs(compression, compression_opts))
-    g.create_dataset("history", data=state.history, **_compression_kwargs(compression, compression_opts))
+    g.create_dataset(
+        "signals",
+        data=state.signals,
+        **_compression_kwargs(compression, compression_opts),
+    )
+    g.create_dataset(
+        "history",
+        data=state.history,
+        **_compression_kwargs(compression, compression_opts),
+    )
     dt = h5py.string_dtype(encoding="utf-8")
-    g.create_dataset("channel_names", data=np.array(state.channel_names, dtype=object), dtype=dt)
+    g.create_dataset(
+        "channel_names",
+        data=np.array(state.channel_names, dtype=object),
+        dtype=dt,
+    )
     g.attrs["metadata_json"] = _json_dumps(state.metadata)
     g.attrs["readonly"] = bool(state.readonly)
 
     gd = g.create_group("derived")
     for k, arr in state.derived.items():
-        gd.create_dataset(k, data=np.asarray(arr), **_compression_kwargs(compression, compression_opts))
+        gd.create_dataset(
+            k,
+            data=np.asarray(arr),
+            **_compression_kwargs(compression, compression_opts),
+        )
 
     gs = g.create_group("summary")
     order: list[str] = []
@@ -226,11 +275,18 @@ def _write_state_group(g: Any, state: PhotometryState, *, compression: str | Non
         gg.attrs["metrics_json"] = _json_dumps(rec.metrics)
         if rec.notes is not None:
             gg.attrs["notes"] = rec.notes
-    g.create_dataset("summary_order", data=np.array(order, dtype=object), dtype=dt)
+    g.create_dataset(
+        "summary_order", data=np.array(order, dtype=object), dtype=dt
+    )
 
     gr = g.create_group("results")
     for result_id, payload in state.results.items():
-        _write_payload_group(gr.create_group(str(result_id)), payload, compression=compression, compression_opts=compression_opts)
+        _write_payload_group(
+            gr.create_group(str(result_id)),
+            payload,
+            compression=compression,
+            compression_opts=compression_opts,
+        )
 
 
 def _read_state_group(g: Any) -> PhotometryState:
@@ -248,7 +304,11 @@ def _read_state_group(g: Any) -> PhotometryState:
         for k in g["derived"].keys():
             derived[str(k)] = np.asarray(g["derived"][k], dtype=float)
     summary: list[StageRecord] = []
-    order = [_decode_str(x) for x in g["summary_order"][...]] if "summary_order" in g else list(g.get("summary", {}).keys())
+    order = (
+        [_decode_str(x) for x in g["summary_order"][...]]
+        if "summary_order" in g
+        else list(g.get("summary", {}).keys())
+    )
     if "summary" in g:
         for stage_id in order:
             if stage_id not in g["summary"]:
@@ -257,18 +317,22 @@ def _read_state_group(g: Any) -> PhotometryState:
             params = _json_loads(gg.attrs.get("params_json", "{}"))
             metrics = _json_loads(gg.attrs.get("metrics_json", "{}"))
             notes = gg.attrs.get("notes")
-            summary.append(StageRecord(
-                stage_id=str(stage_id),
-                name=_decode_str(gg.attrs["name"]),
-                params=params if isinstance(params, dict) else {},
-                metrics=metrics if isinstance(metrics, dict) else {},
-                notes=_decode_str(notes) if notes is not None else None,
-            ))
+            summary.append(
+                StageRecord(
+                    stage_id=str(stage_id),
+                    name=_decode_str(gg.attrs["name"]),
+                    params=params if isinstance(params, dict) else {},
+                    metrics=metrics if isinstance(metrics, dict) else {},
+                    notes=_decode_str(notes) if notes is not None else None,
+                )
+            )
     results: dict[str, dict[str, Any]] = {}
     if "results" in g:
         for result_id in g["results"].keys():
             payload = _read_payload_group(g["results"][result_id])
-            results[str(result_id)] = payload if isinstance(payload, dict) else {}
+            results[str(result_id)] = (
+                payload if isinstance(payload, dict) else {}
+            )
     return PhotometryState(
         time_seconds=t,
         signals=s,
@@ -282,14 +346,22 @@ def _read_state_group(g: Any) -> PhotometryState:
     )
 
 
-def save_state_h5(state: PhotometryState, path: Path | str, *, compression: str | None = "gzip", compression_opts: int = 4) -> None:
+def save_state_h5(
+    state: PhotometryState,
+    path: Path | str,
+    *,
+    compression: str | None = "gzip",
+    compression_opts: int = 4,
+) -> None:
     h5py = _require_h5py()
     path = Path(path)
     with h5py.File(path, "w") as f:
         f.attrs["schema"] = "fibphot_state"
         f.attrs["schema_version"] = 2
         f.attrs["created_utc"] = datetime.now(timezone.utc).isoformat()
-        _write_state_group(f, state, compression=compression, compression_opts=compression_opts)
+        _write_state_group(
+            f, state, compression=compression, compression_opts=compression_opts
+        )
 
 
 def load_state_h5(path: Path | str) -> PhotometryState:
@@ -298,7 +370,13 @@ def load_state_h5(path: Path | str) -> PhotometryState:
         return _read_state_group(f)
 
 
-def save_collection_h5(coll: Any, path: Path | str, *, compression: str | None = "gzip", compression_opts: int = 4) -> None:
+def save_collection_h5(
+    coll: Any,
+    path: Path | str,
+    *,
+    compression: str | None = "gzip",
+    compression_opts: int = 4,
+) -> None:
     h5py = _require_h5py()
     path = Path(path)
     with h5py.File(path, "w") as f:
@@ -315,7 +393,12 @@ def save_collection_h5(coll: Any, path: Path | str, *, compression: str | None =
                 j += 1
                 name = f"{base}_{j}"
             order.append(name)
-            _write_state_group(g_states.create_group(name), st, compression=compression, compression_opts=compression_opts)
+            _write_state_group(
+                g_states.create_group(name),
+                st,
+                compression=compression,
+                compression_opts=compression_opts,
+            )
         dt = h5py.string_dtype(encoding="utf-8")
         f.create_dataset("order", data=np.array(order, dtype=object), dtype=dt)
 
@@ -323,6 +406,7 @@ def save_collection_h5(coll: Any, path: Path | str, *, compression: str | None =
 def load_collection_h5(path: Path | str):
     h5py = _require_h5py()
     from ..collection import PhotometryCollection
+
     with h5py.File(Path(path), "r") as f:
         order = [_decode_str(x) for x in f["order"][...]]
         states = [_read_state_group(f["states"][key]) for key in order]

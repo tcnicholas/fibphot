@@ -39,7 +39,9 @@ class StateValidation:
 
     def raise_if_bad(self) -> None:
         if not self.ok:
-            raise ValueError("Invalid PhotometryState: " + "; ".join(self.warnings))
+            raise ValueError(
+                "Invalid PhotometryState: " + "; ".join(self.warnings)
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,7 +79,9 @@ class PhotometryState:
     time_seconds: FloatArray
     signals: FloatArray
     channel_names: tuple[str, ...]
-    history: FloatArray = field(default_factory=lambda: np.empty((0, 0, 0), dtype=float))
+    history: FloatArray = field(
+        default_factory=lambda: np.empty((0, 0, 0), dtype=float)
+    )
     summary: tuple[StageRecord, ...] = ()
     derived: dict[str, FloatArray] = field(default_factory=dict)
     results: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -93,7 +97,9 @@ class PhotometryState:
         if t.ndim != 1:
             raise ValueError("time_seconds must be 1D.")
         if s.ndim != 2:
-            raise ValueError("signals must be 2D with shape (n_signals, n_samples).")
+            raise ValueError(
+                "signals must be 2D with shape (n_signals, n_samples)."
+            )
         if s.shape[1] != t.shape[0]:
             raise ValueError(
                 "signals second dimension must match time length: "
@@ -108,7 +114,9 @@ class PhotometryState:
         names = tuple(str(n).strip().lower() for n in self.channel_names)
         if len(set(names)) != len(names):
             dupes = sorted({n for n in names if names.count(n) > 1})
-            raise ValueError(f"Duplicate channel names after normalisation: {dupes}")
+            raise ValueError(
+                f"Duplicate channel names after normalisation: {dupes}"
+            )
         name_to_idx = {n: i for i, n in enumerate(names)}
 
         h = np.asarray(self.history, dtype=float)
@@ -120,7 +128,9 @@ class PhotometryState:
                 f"matching signals; got {h.shape}, expected (*, {s.shape[0]}, {s.shape[1]})."
             )
 
-        derived = {str(k): np.asarray(v, dtype=float) for k, v in self.derived.items()}
+        derived = {
+            str(k): np.asarray(v, dtype=float) for k, v in self.derived.items()
+        }
 
         if self.readonly:
             t = np.array(t, copy=True)
@@ -175,7 +185,9 @@ class PhotometryState:
         stem = Path(str(src)).stem
         return stem.split("_", maxsplit=1)[0].lower() if stem else None
 
-    def validate(self, *, regularity_rtol: float = 0.05, raise_on_error: bool = False) -> StateValidation:
+    def validate(
+        self, *, regularity_rtol: float = 0.05, raise_on_error: bool = False
+    ) -> StateValidation:
         warnings: list[str] = []
         t = np.asarray(self.time_seconds, dtype=float)
         s = np.asarray(self.signals, dtype=float)
@@ -185,7 +197,9 @@ class PhotometryState:
         if s.ndim != 2:
             warnings.append("signals is not 2D")
         if t.size != s.shape[1]:
-            warnings.append("time_seconds length does not match signals samples")
+            warnings.append(
+                "time_seconds length does not match signals samples"
+            )
         if not np.all(np.isfinite(t)):
             warnings.append("time_seconds contains non-finite values")
         if t.size >= 2:
@@ -195,9 +209,15 @@ class PhotometryState:
             finite_dt = dt[np.isfinite(dt) & (dt > 0)]
             if finite_dt.size:
                 med = float(np.median(finite_dt))
-                max_rel = float(np.nanmax(np.abs(finite_dt - med) / med)) if med > 0 else float("inf")
+                max_rel = (
+                    float(np.nanmax(np.abs(finite_dt - med) / med))
+                    if med > 0
+                    else float("inf")
+                )
                 if max_rel > regularity_rtol:
-                    warnings.append(f"sampling interval is irregular: max relative deviation {max_rel:.3g}")
+                    warnings.append(
+                        f"sampling interval is irregular: max relative deviation {max_rel:.3g}"
+                    )
         if s.size and not np.any(np.isfinite(s)):
             warnings.append("signals contain no finite values")
         if any(not n for n in self.channel_names):
@@ -210,7 +230,9 @@ class PhotometryState:
             out.raise_if_bad()
         return out
 
-    def copy(self, *, deep: bool = True, readonly: bool | None = None) -> PhotometryState:
+    def copy(
+        self, *, deep: bool = True, readonly: bool | None = None
+    ) -> PhotometryState:
         ro = self.readonly if readonly is None else bool(readonly)
         return PhotometryState(
             time_seconds=_copy_array(self.time_seconds, deep=deep, readonly=ro),
@@ -218,7 +240,10 @@ class PhotometryState:
             channel_names=self.channel_names,
             history=_copy_array(self.history, deep=deep, readonly=ro),
             summary=self.summary,
-            derived={k: _copy_array(v, deep=deep, readonly=ro) for k, v in self.derived.items()},
+            derived={
+                k: _copy_array(v, deep=deep, readonly=ro)
+                for k, v in self.derived.items()
+            },
             results=dict(self.results),
             metadata=dict(self.metadata),
             readonly=ro,
@@ -233,7 +258,9 @@ class PhotometryState:
     def idx(self, channel: str) -> int:
         key = channel.lower()
         if key not in self._name_to_index:
-            raise KeyError(f"Unknown channel {channel!r}. Available: {self.channel_names}")
+            raise KeyError(
+                f"Unknown channel {channel!r}. Available: {self.channel_names}"
+            )
         return self._name_to_index[key]
 
     def channel(self, channel: str) -> FloatArray:
@@ -245,13 +272,17 @@ class PhotometryState:
     def with_channel(self, channel: str, values: FloatArray) -> PhotometryState:
         v = np.asarray(values, dtype=float)
         if v.shape != (self.n_samples,):
-            raise ValueError(f"Channel replacement must have shape ({self.n_samples},), got {v.shape}.")
+            raise ValueError(
+                f"Channel replacement must have shape ({self.n_samples},), got {v.shape}."
+            )
         i = self.idx(channel)
         new_signals = np.array(self.signals, copy=True)
         new_signals[i] = v
         return replace(self, signals=new_signals)
 
-    def with_metadata(self, updates: dict[str, Any] | None = None, **kwargs: Any) -> PhotometryState:
+    def with_metadata(
+        self, updates: dict[str, Any] | None = None, **kwargs: Any
+    ) -> PhotometryState:
         patch: dict[str, Any] = {}
         if updates:
             patch.update(updates)
@@ -260,7 +291,9 @@ class PhotometryState:
         new_meta.update(patch)
         return replace(self, metadata=new_meta)
 
-    def with_tags(self, tags: dict[str, str], *, overwrite: bool = False) -> PhotometryState:
+    def with_tags(
+        self, tags: dict[str, str], *, overwrite: bool = False
+    ) -> PhotometryState:
         existing = dict(self.tags)
         incoming = {str(k): str(v) for k, v in tags.items()}
         if overwrite:
@@ -270,9 +303,16 @@ class PhotometryState:
                 existing.setdefault(k, v)
         return self.with_metadata(tags=existing)
 
-    def push_history(self, policy: HistoryPolicy = "all", *, checkpoint: bool = False) -> PhotometryState:
+    def push_history(
+        self, policy: HistoryPolicy = "all", *, checkpoint: bool = False
+    ) -> PhotometryState:
         if policy == "none":
-            return replace(self, history=np.empty((0, self.n_signals, self.n_samples), dtype=float))
+            return replace(
+                self,
+                history=np.empty(
+                    (0, self.n_signals, self.n_samples), dtype=float
+                ),
+            )
         if policy == "raw":
             if self.history.shape[0] > 0:
                 return self
@@ -280,9 +320,13 @@ class PhotometryState:
         elif policy == "checkpoints":
             if not checkpoint:
                 return self
-            new_hist = np.concatenate([self.history, self.signals[None, :, :]], axis=0)
+            new_hist = np.concatenate(
+                [self.history, self.signals[None, :, :]], axis=0
+            )
         elif policy == "all":
-            new_hist = np.concatenate([self.history, self.signals[None, :, :]], axis=0)
+            new_hist = np.concatenate(
+                [self.history, self.signals[None, :, :]], axis=0
+            )
         else:
             raise ValueError(f"Unknown history policy: {policy!r}")
         return replace(self, history=np.asarray(new_hist, dtype=float))
@@ -308,7 +352,9 @@ class PhotometryState:
         if n_steps < 1:
             raise ValueError("n_steps must be >= 1.")
         if self.history.shape[0] < n_steps:
-            raise ValueError(f"Cannot revert {n_steps} step(s); history has {self.history.shape[0]}.")
+            raise ValueError(
+                f"Cannot revert {n_steps} step(s); history has {self.history.shape[0]}."
+            )
         restored_signals = self.history[-n_steps]
         new_history = self.history[:-n_steps]
         new_summary = self.summary[:-n_steps]
@@ -335,14 +381,23 @@ class PhotometryState:
         steps_to_drop = len(self.summary) - (last_idx + 1)
         return self if steps_to_drop == 0 else self.revert(steps_to_drop)
 
-    def pipe(self, *stages: Any, history: HistoryPolicy = "all") -> PhotometryState:
+    def pipe(
+        self, *stages: Any, history: HistoryPolicy = "all"
+    ) -> PhotometryState:
         state: PhotometryState = self
         for st in stages:
             run = getattr(st, "run", None)
             state = run(state, history=history) if callable(run) else st(state)
         return state
 
-    def pipe_with_plots(self, *stages: Any, channels: list[str] | None = None, control: str | None = None, title: str | None = None, history: HistoryPolicy = "all") -> tuple[PhotometryState, object | None]:
+    def pipe_with_plots(
+        self,
+        *stages: Any,
+        channels: list[str] | None = None,
+        control: str | None = None,
+        title: str | None = None,
+        history: HistoryPolicy = "all",
+    ) -> tuple[PhotometryState, object | None]:
         state: PhotometryState = self
         requested_ids: list[str] = []
         for st in stages:
@@ -353,19 +408,29 @@ class PhotometryState:
         if not requested_ids:
             return state, None
         from .plotting import plot_pipeline_overview
-        fig, _ = plot_pipeline_overview(state, stage_ids=requested_ids, channels=channels, control=control, title=title)
+
+        fig, _ = plot_pipeline_overview(
+            state,
+            stage_ids=requested_ids,
+            channels=channels,
+            control=control,
+            title=title,
+        )
         return state, fig
 
     def plot(self, *, signal: str, control: str | None = None, **kwargs: Any):
         from .plotting import plot_current
+
         return plot_current(self, signal=signal, control=control, **kwargs)
 
     def plot_history(self, channel: str, **kwargs: Any):
         from .plotting import plot_history
+
         return plot_history(self, channel, **kwargs)
 
     def analyse(self, *analyses: Any):
         from .analysis.report import PhotometryReport
+
         report = PhotometryReport(self)
         for analysis in analyses:
             out = analysis(self)
@@ -375,13 +440,26 @@ class PhotometryState:
                 report = report.add(out)
         return report
 
-    def to_h5(self, path: Path | str, *, compression: str | None = "gzip", compression_opts: int = 4) -> None:
+    def to_h5(
+        self,
+        path: Path | str,
+        *,
+        compression: str | None = "gzip",
+        compression_opts: int = 4,
+    ) -> None:
         from .io.h5 import save_state_h5
-        save_state_h5(self, path, compression=compression, compression_opts=compression_opts)
+
+        save_state_h5(
+            self,
+            path,
+            compression=compression,
+            compression_opts=compression_opts,
+        )
 
     @classmethod
     def from_h5(cls, path: Path | str) -> PhotometryState:
         from .io.h5 import load_state_h5
+
         return load_state_h5(path)
 
     def __repr__(self) -> str:
@@ -407,7 +485,11 @@ class PhotometryState:
             info["stages"] = len(self.summary)
             info["last_stage"] = self.summary[-1].name
             names = [r.name for r in self.summary]
-            info["pipeline"] = tuple(names) if len(names) <= 5 else (names[0], names[1], "...", names[-1])
+            info["pipeline"] = (
+                tuple(names)
+                if len(names) <= 5
+                else (names[0], names[1], "...", names[-1])
+            )
         if self.derived:
             info["derived"] = trunc_seq(tuple(self.derived), max_items=10)
         if self.results:
@@ -418,4 +500,6 @@ class PhotometryState:
             if more > 0:
                 kv.append(f"...+{more}")
             info["tags"] = ReprText("{" + ", ".join(kv) + "}")
-        return uniform_repr("PhotometryState", **info, indent_width=4, max_width=88)
+        return uniform_repr(
+            "PhotometryState", **info, indent_width=4, max_width=88
+        )

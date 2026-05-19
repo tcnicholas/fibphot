@@ -32,16 +32,30 @@ class EventAlignedTraces:
 
     def to_dataframe(self):
         import pandas as pd
+
         rows: list[dict[str, Any]] = []
         for ei, event_t in enumerate(self.event_times_s):
-            meta = self.event_metadata[ei] if ei < len(self.event_metadata) else {}
+            meta = (
+                self.event_metadata[ei] if ei < len(self.event_metadata) else {}
+            )
             for ci, channel in enumerate(self.channel_names):
                 for ti, trel in enumerate(self.time_relative_s):
-                    rows.append({"event_i": ei, "event_time_s": event_t, "channel": channel, "time_relative_s": trel, "value": self.data[ei, ci, ti], **meta})
+                    rows.append(
+                        {
+                            "event_i": ei,
+                            "event_time_s": event_t,
+                            "channel": channel,
+                            "time_relative_s": trel,
+                            "value": self.data[ei, ci, ti],
+                            **meta,
+                        }
+                    )
         return pd.DataFrame(rows)
 
 
-def _as_event_times(events_s: Sequence[float] | Mapping[str, Sequence[float]]) -> tuple[np.ndarray, tuple[dict[str, Any], ...]]:
+def _as_event_times(
+    events_s: Sequence[float] | Mapping[str, Sequence[float]],
+) -> tuple[np.ndarray, tuple[dict[str, Any], ...]]:
     if isinstance(events_s, Mapping):
         times: list[float] = []
         meta: list[dict[str, Any]] = []
@@ -50,7 +64,9 @@ def _as_event_times(events_s: Sequence[float] | Mapping[str, Sequence[float]]) -
                 times.append(float(v))
                 meta.append({"event_label": str(label)})
         order = np.argsort(times)
-        return np.asarray(times, dtype=float)[order], tuple(meta[int(i)] for i in order)
+        return np.asarray(times, dtype=float)[order], tuple(
+            meta[int(i)] for i in order
+        )
     arr = np.asarray(list(events_s), dtype=float)
     return arr, tuple({} for _ in arr)
 
@@ -96,7 +112,9 @@ def align_to_events(
             y = np.asarray(state.signals[idx], dtype=float)
             mask = np.isfinite(t) & np.isfinite(y)
             if np.sum(mask) >= 2:
-                data[ei, ci] = np.interp(target, t[mask], y[mask], left=fill, right=fill)
+                data[ei, ci] = np.interp(
+                    target, t[mask], y[mask], left=fill, right=fill
+                )
     return EventAlignedTraces(
         time_relative_s=rel,
         data=data,
@@ -106,7 +124,11 @@ def align_to_events(
     )
 
 
-def event_aligned_summary_dataframe(aligned: EventAlignedTraces, *, statistics: Sequence[str] = ("mean", "std", "sem")):
+def event_aligned_summary_dataframe(
+    aligned: EventAlignedTraces,
+    *,
+    statistics: Sequence[str] = ("mean", "std", "sem"),
+):
     """Return one row per relative time and channel for aligned traces."""
     import pandas as pd
     from .statistics import nan_stats
@@ -115,7 +137,11 @@ def event_aligned_summary_dataframe(aligned: EventAlignedTraces, *, statistics: 
     rows: list[dict[str, Any]] = []
     for ci, channel in enumerate(aligned.channel_names):
         for ti, trel in enumerate(aligned.time_relative_s):
-            row: dict[str, Any] = {"channel": channel, "time_relative_s": float(trel), "n_events": int(stats["count"][ci, ti])}
+            row: dict[str, Any] = {
+                "channel": channel,
+                "time_relative_s": float(trel),
+                "n_events": int(stats["count"][ci, ti]),
+            }
             for stat in statistics:
                 if stat == "count":
                     row["count"] = int(stats["count"][ci, ti])
@@ -125,19 +151,38 @@ def event_aligned_summary_dataframe(aligned: EventAlignedTraces, *, statistics: 
     return pd.DataFrame(rows)
 
 
-def event_aligned_traces_dataframe(aligned: EventAlignedTraces, *, max_events: int | None = None):
+def event_aligned_traces_dataframe(
+    aligned: EventAlignedTraces, *, max_events: int | None = None
+):
     """Return long-form event-aligned traces."""
     import pandas as pd
 
-    n_events = aligned.n_events if max_events is None else min(aligned.n_events, int(max_events))
+    n_events = (
+        aligned.n_events
+        if max_events is None
+        else min(aligned.n_events, int(max_events))
+    )
     rows: list[dict[str, Any]] = []
     for ei in range(n_events):
-        meta = aligned.event_metadata[ei] if ei < len(aligned.event_metadata) else {}
+        meta = (
+            aligned.event_metadata[ei]
+            if ei < len(aligned.event_metadata)
+            else {}
+        )
         for ci, channel in enumerate(aligned.channel_names):
             vals = aligned.data[ei, ci]
             for ti, trel in enumerate(aligned.time_relative_s):
                 v = vals[ti]
-                rows.append({"event_i": ei, "event_time_s": float(aligned.event_times_s[ei]), "channel": channel, "time_relative_s": float(trel), "value": float(v) if np.isfinite(v) else np.nan, **meta})
+                rows.append(
+                    {
+                        "event_i": ei,
+                        "event_time_s": float(aligned.event_times_s[ei]),
+                        "channel": channel,
+                        "time_relative_s": float(trel),
+                        "value": float(v) if np.isfinite(v) else np.nan,
+                        **meta,
+                    }
+                )
     return pd.DataFrame(rows)
 
 
@@ -165,9 +210,17 @@ def select_events_by_spacing(
     return keep
 
 
-def event_aligned_subset(aligned: EventAlignedTraces, mask: Sequence[bool]) -> EventAlignedTraces:
+def event_aligned_subset(
+    aligned: EventAlignedTraces, mask: Sequence[bool]
+) -> EventAlignedTraces:
     m = np.asarray(mask, dtype=bool)
     if m.shape[0] != aligned.n_events:
         raise ValueError("mask must have one value per event.")
     meta = tuple(x for x, ok in zip(aligned.event_metadata, m.tolist()) if ok)
-    return EventAlignedTraces(aligned.time_relative_s, aligned.data[m], aligned.channel_names, aligned.event_times_s[m], meta)
+    return EventAlignedTraces(
+        aligned.time_relative_s,
+        aligned.data[m],
+        aligned.channel_names,
+        aligned.event_times_s[m],
+        meta,
+    )

@@ -75,7 +75,9 @@ class TraceStatistics:
         for i, name in enumerate(self.channel_names):
             if str(name).lower() == wanted:
                 return i
-        raise KeyError(f"Unknown channel {channel!r}. Available: {self.channel_names}")
+        raise KeyError(
+            f"Unknown channel {channel!r}. Available: {self.channel_names}"
+        )
 
 
 def _as_relative_time(t: FloatArray) -> FloatArray:
