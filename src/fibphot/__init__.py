@@ -22,4 +22,4 @@ __all__ = [
     "StageRecord",
     "StateValidation",
 ]
-__version__ = "0.1.11"
+__version__ = "0.1.8"
