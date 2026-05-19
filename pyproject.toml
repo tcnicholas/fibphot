@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fibphot"
-version = "0.1.6"
+version = "0.1.7"
 description = "Analysis pipeline for fibre photometry data"
 readme = "README.md"
 authors = [{ name = "Thomas Nicholas" }]
@@ -69,7 +69,7 @@ gui = [
 fibphot-gui = "fibphot.gui.app:main"
 
 [tool.bumpver]
-current_version = "0.1.6"
+current_version = "0.1.7"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "bump {old_version} -> {new_version}"
 commit = true
