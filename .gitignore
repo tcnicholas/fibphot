@@ -19,7 +19,6 @@ wheels/
 
 # Virtual environments
 .venv
-uv.lock
 
 # Custom files
 .local
